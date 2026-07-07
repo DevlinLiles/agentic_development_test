@@ -1,0 +1,43 @@
+.move-history-panel {
+  min-width: 12rem;
+  max-height: 24rem;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.move-history-panel__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.move-history-panel__list li {
+  display: flex;
+  gap: 0.5rem;
+  font-family: monospace;
+}
+
+.move-history-panel__number {
+  color: #888;
+  min-width: 1.75rem;
+}
+
+.move-history-panel__color {
+  min-width: 3.5rem;
+  color: #555;
+}
+
+.move-history-panel__empty {
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.move-history-panel__error {
+  color: #b3261e;
+  font-size: 0.85rem;
+}

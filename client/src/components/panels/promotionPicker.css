@@ -1,0 +1,53 @@
+.promotion-picker__overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.promotion-picker {
+  background-color: #fff;
+  color: #1a1a1a;
+  border-radius: 8px;
+  padding: 1.25rem;
+  min-width: 16rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.promotion-picker__options {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.promotion-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 1.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #f7f7f7;
+  cursor: pointer;
+}
+
+.promotion-picker__option:hover {
+  background-color: #e8e8e8;
+}
+
+.promotion-picker__option-label {
+  font-size: 0.7rem;
+}
+
+.promotion-picker__cancel {
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  text-decoration: underline;
+}

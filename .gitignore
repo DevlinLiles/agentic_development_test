@@ -55,3 +55,22 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Node / client
+client/node_modules/
+client/dist/
+client/coverage/
+client/test-results/
+client/playwright-report/
+client/blob-report/
+client/playwright/.cache/
+*.local
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+
+# Docker / local secrets
+.env.local

@@ -1,0 +1,18 @@
+.create-game-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.create-game-screen button {
+  font-size: 1.1rem;
+  padding: 0.6rem 1.5rem;
+  cursor: pointer;
+}
+
+.create-game-screen__error {
+  color: #b3261e;
+}

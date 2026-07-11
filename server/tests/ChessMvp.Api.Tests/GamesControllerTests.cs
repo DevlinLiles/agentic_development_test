@@ -51,6 +51,13 @@ public class GamesControllerTests
         return _client.SendAsync(request);
     }
 
+    private Task<HttpResponseMessage> ResignAsync(Guid gameId, Guid token)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/games/{gameId}/resign");
+        request.Headers.Add("X-Player-Token", token.ToString());
+        return _client.SendAsync(request);
+    }
+
     [Fact]
     public async Task CreateGame_ReturnsWaitingGameWithWhiteToken()
     {
@@ -195,5 +202,102 @@ public class GamesControllerTests
         Assert.NotNull(history);
         var onlyMove = Assert.Single(history!.Moves);
         Assert.Contains(onlyMove.San, new[] { "e4", "d4" });
+    }
+
+    [Fact]
+    public async Task Resign_WhiteResigns_EndsGameWithBlackWinning()
+    {
+        var (gameId, whiteToken) = await CreateGameAsync();
+        await JoinGameAsync(gameId);
+
+        var response = await ResignAsync(gameId, whiteToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<GameStateResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameStatus.Ended, body!.Status);
+        Assert.Equal(GameResult.BlackWins, body.Result);
+        Assert.Equal(GameResultReason.Resignation, body.ResultReason);
+
+        // The resigned player's view reports their own color, so they see Black as the winner.
+        Assert.Equal(PlayerColor.White, body.YourColor);
+
+        var finalState = await _client.GetFromJsonAsync<GameStateResponse>($"/api/games/{gameId}", JsonOptions);
+        Assert.NotNull(finalState);
+        Assert.Equal(GameStatus.Ended, finalState!.Status);
+        Assert.Equal(GameResult.BlackWins, finalState.Result);
+        Assert.Equal(GameResultReason.Resignation, finalState.ResultReason);
+    }
+
+    [Fact]
+    public async Task Resign_BlackResigns_EndsGameWithWhiteWinning()
+    {
+        var (gameId, _) = await CreateGameAsync();
+        var blackToken = await JoinGameAsync(gameId);
+
+        var response = await ResignAsync(gameId, blackToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<GameStateResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameStatus.Ended, body!.Status);
+        Assert.Equal(GameResult.WhiteWins, body.Result);
+        Assert.Equal(GameResultReason.Resignation, body.ResultReason);
+        Assert.Equal(PlayerColor.Black, body.YourColor);
+    }
+
+    [Fact]
+    public async Task Resign_BeforeSecondPlayerJoins_Returns409()
+    {
+        var (gameId, whiteToken) = await CreateGameAsync();
+
+        var response = await ResignAsync(gameId, whiteToken);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Resign_AlreadyEndedGame_Returns409()
+    {
+        var (gameId, whiteToken) = await CreateGameAsync();
+        await JoinGameAsync(gameId);
+
+        var firstResign = await ResignAsync(gameId, whiteToken);
+        Assert.Equal(HttpStatusCode.OK, firstResign.StatusCode);
+
+        // A second resignation (from either side) must be rejected — the game is already over.
+        var secondResign = await ResignAsync(gameId, whiteToken);
+
+        Assert.Equal(HttpStatusCode.Conflict, secondResign.StatusCode);
+    }
+
+    [Fact]
+    public async Task Resign_WithTokenThatMatchesNeitherSeat_Returns401()
+    {
+        var (gameId, _) = await CreateGameAsync();
+        await JoinGameAsync(gameId);
+
+        var response = await ResignAsync(gameId, Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Resign_WithoutPlayerTokenHeader_Returns401()
+    {
+        var (gameId, _) = await CreateGameAsync();
+        await JoinGameAsync(gameId);
+
+        var response = await _client.PostAsync($"/api/games/{gameId}/resign", content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Resign_UnknownGame_Returns404()
+    {
+        var response = await ResignAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

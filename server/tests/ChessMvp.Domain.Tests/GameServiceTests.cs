@@ -307,4 +307,80 @@ public class GameServiceTests
 
         Assert.Same(moves, history);
     }
+
+    [Fact]
+    public async Task ResignAsync_UnknownGame_ThrowsGameNotFoundException()
+    {
+        _repository.GetByIdWithMovesAsync(Arg.Any<Guid>()).Returns((Game?)null);
+
+        await Assert.ThrowsAsync<GameNotFoundException>(() => _sut.ResignAsync(Guid.NewGuid(), WhiteToken));
+    }
+
+    [Fact]
+    public async Task ResignAsync_TokenMatchesNeitherSeat_ThrowsInvalidSlotTokenException()
+    {
+        var game = NewActiveGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        await Assert.ThrowsAsync<InvalidSlotTokenException>(() => _sut.ResignAsync(game.Id, Guid.NewGuid()));
+
+        await _repository.DidNotReceive().SaveChangesAsync();
+        await _notifier.DidNotReceive().NotifyGameUpdatedAsync(Arg.Any<Game>());
+    }
+
+    [Fact]
+    public async Task ResignAsync_GameWaitingForPlayer2_ThrowsGameNotActiveException()
+    {
+        var game = NewActiveGame();
+        game.Status = GameStatus.WaitingForPlayer2;
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        await Assert.ThrowsAsync<GameNotActiveException>(() => _sut.ResignAsync(game.Id, WhiteToken));
+    }
+
+    [Fact]
+    public async Task ResignAsync_GameAlreadyEnded_ThrowsGameNotActiveException()
+    {
+        var game = NewActiveGame();
+        game.Status = GameStatus.Ended;
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        await Assert.ThrowsAsync<GameNotActiveException>(() => _sut.ResignAsync(game.Id, WhiteToken));
+    }
+
+    [Fact]
+    public async Task ResignAsync_WhiteResigns_EndsGameWithBlackWinningAndNotifies()
+    {
+        var game = NewActiveGame();
+        game.Turn = PlayerColor.White;
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        var updated = await _sut.ResignAsync(game.Id, WhiteToken);
+
+        Assert.Equal(GameStatus.Ended, updated.Status);
+        Assert.Equal(GameResult.BlackWins, updated.Result);
+        Assert.Equal(GameResultReason.Resignation, updated.ResultReason);
+        // Resignation does not add a move to the history; the result fields alone describe it.
+        Assert.Empty(updated.Moves);
+
+        await _repository.Received(1).SaveChangesAsync();
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
+    }
+
+    [Fact]
+    public async Task ResignAsync_BlackResigns_EndsGameWithWhiteWinningAndNotifies()
+    {
+        var game = NewActiveGame();
+        game.Turn = PlayerColor.White; // resignation is valid on either player's turn
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        var updated = await _sut.ResignAsync(game.Id, BlackToken);
+
+        Assert.Equal(GameStatus.Ended, updated.Status);
+        Assert.Equal(GameResult.WhiteWins, updated.Result);
+        Assert.Equal(GameResultReason.Resignation, updated.ResultReason);
+
+        await _repository.Received(1).SaveChangesAsync();
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
+    }
 }

@@ -1,0 +1,51 @@
+.resign-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.resign-panel__button {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
+  color: #333;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.resign-panel__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.resign-panel__button--danger {
+  background-color: #b3261e;
+  border-color: #b3261e;
+  color: #fff;
+}
+
+.resign-panel__button--cancel {
+  background-color: #fff;
+}
+
+.resign-panel__confirm {
+  text-align: center;
+}
+
+.resign-panel__confirm p {
+  margin: 0 0 0.5rem;
+}
+
+.resign-panel__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.resign-panel__error {
+  color: #b3261e;
+  font-size: 0.85rem;
+  margin: 0;
+}

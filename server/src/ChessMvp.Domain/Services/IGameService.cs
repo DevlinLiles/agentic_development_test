@@ -17,5 +17,7 @@ public interface IGameService
         string toSquare,
         PromotionPieceType? promotion);
 
+    Task<Game> ResignAsync(Guid gameId, Guid slotToken);
+
     Task<IReadOnlyList<Move>> GetMoveHistoryAsync(Guid gameId);
 }

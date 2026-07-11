@@ -77,6 +77,32 @@ describe("StatusPanel", () => {
     expect(screen.getByText("Checkmate — Black wins")).toBeInTheDocument();
   });
 
+  it("renders resignation white wins", () => {
+    render(
+      <StatusPanel
+        gameState={makeGameState({
+          status: "Ended",
+          result: "WhiteWins",
+          resultReason: "Resignation",
+        })}
+      />,
+    );
+    expect(screen.getByText("Resignation — White wins")).toBeInTheDocument();
+  });
+
+  it("renders resignation black wins", () => {
+    render(
+      <StatusPanel
+        gameState={makeGameState({
+          status: "Ended",
+          result: "BlackWins",
+          resultReason: "Resignation",
+        })}
+      />,
+    );
+    expect(screen.getByText("Resignation — Black wins")).toBeInTheDocument();
+  });
+
   it("renders stalemate as a draw", () => {
     render(
       <StatusPanel

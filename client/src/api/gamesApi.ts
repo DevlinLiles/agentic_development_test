@@ -42,6 +42,16 @@ export function submitMove(
   });
 }
 
+export function resignGame(
+  gameId: string,
+  token: string,
+): Promise<GameStateResponse> {
+  return apiRequest<GameStateResponse>(`/api/games/${gameId}/resign`, {
+    method: "POST",
+    token,
+  });
+}
+
 export function getMoveHistory(
   gameId: string,
   token?: string | null,

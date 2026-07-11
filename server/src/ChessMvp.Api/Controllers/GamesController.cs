@@ -130,6 +130,40 @@ public class GamesController : ControllerBase
         }
     }
 
+    [HttpPost("{gameId:guid}/resign")]
+    public async Task<ActionResult<GameStateResponse>> Resign(Guid gameId)
+    {
+        var playerToken = TryGetPlayerToken();
+        if (playerToken is null)
+        {
+            return Unauthorized(new ErrorResponse("InvalidPlayerToken", $"{PlayerTokenHeader} header is required."));
+        }
+
+        try
+        {
+            var game = await _gameService.ResignAsync(gameId, playerToken.Value);
+
+            var yourColor = TryResolveColor(game, playerToken);
+            return Ok(GameStateResponse.FromGame(game, yourColor));
+        }
+        catch (GameNotFoundException)
+        {
+            return NotFound(new ErrorResponse("GameNotFound"));
+        }
+        catch (InvalidSlotTokenException ex)
+        {
+            return Unauthorized(new ErrorResponse("InvalidPlayerToken", ex.Message));
+        }
+        catch (GameNotActiveException ex)
+        {
+            return Conflict(new ErrorResponse("GameNotActive", ex.Message));
+        }
+        catch (GameStateConflictException ex)
+        {
+            return Conflict(new ErrorResponse("GameStateConflict", ex.Message));
+        }
+    }
+
     [HttpGet("{gameId:guid}/moves")]
     public async Task<ActionResult<MoveHistoryResponse>> GetMoveHistory(Guid gameId)
     {

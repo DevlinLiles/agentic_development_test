@@ -6,6 +6,7 @@ import { useGameHubConnection } from "../signalr/useGameHubConnection";
 import { ChessBoard } from "../components/board/ChessBoard";
 import { StatusPanel } from "../components/panels/StatusPanel";
 import { JoinLinkPanel } from "../components/panels/JoinLinkPanel";
+import { ResignPanel } from "../components/panels/ResignPanel";
 import { MoveHistoryPanel } from "../components/panels/MoveHistoryPanel";
 import { describeApiError } from "../utils/describeApiError";
 import type { GameStateResponse } from "../types/gameTypes";
@@ -143,6 +144,14 @@ export function GameScreen() {
           refreshKey={gameState.moveCount}
         />
       </div>
+      {session && (
+        <ResignPanel
+          gameId={gameId}
+          playerToken={session.playerToken}
+          gameState={gameState}
+          onStateUpdate={handleStateUpdate}
+        />
+      )}
     </div>
   );
 }

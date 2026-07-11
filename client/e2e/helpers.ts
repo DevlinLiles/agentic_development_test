@@ -36,6 +36,12 @@ export async function playMove(page: Page, from: string, to: string, expectedMov
   await expect(page.locator(".move-history-panel__list li")).toHaveCount(expectedMoveCount);
 }
 
+/** Clicks Resign, confirms the dialog, and waits for the game to end. */
+export async function resign(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Resign" }).click();
+  await page.getByRole("button", { name: "Confirm Resign" }).click();
+}
+
 export function statusPanel(page: Page) {
   return page.locator(".status-panel");
 }

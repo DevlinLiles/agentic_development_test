@@ -150,6 +150,33 @@ public sealed class GameService : IGameService
         return game;
     }
 
+    public async Task<Game> ResignAsync(Guid gameId, Guid slotToken)
+    {
+        var game = await _repository.GetByIdWithMovesAsync(gameId) ?? throw new GameNotFoundException(gameId);
+
+        var resignedColor = ResolveSlotToken(game, slotToken);
+
+        if (game.Status != GameStatus.Active)
+        {
+            throw new GameNotActiveException("This game is not currently active.");
+        }
+
+        // The resigning player concedes, so the opponent wins regardless of whose turn it was.
+        game.Status = GameStatus.Ended;
+        game.Result = resignedColor == PlayerColor.White ? GameResult.BlackWins : GameResult.WhiteWins;
+        game.ResultReason = GameResultReason.Resignation;
+        game.UpdatedUtc = DateTime.UtcNow;
+
+        await _repository.SaveChangesAsync();
+
+        if (_notifier is not null)
+        {
+            await _notifier.NotifyGameUpdatedAsync(game);
+        }
+
+        return game;
+    }
+
     public async Task<IReadOnlyList<Move>> GetMoveHistoryAsync(Guid gameId)
     {
         // Confirm the game exists so callers get a 404-mappable exception instead of an empty list.

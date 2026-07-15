@@ -100,6 +100,106 @@ public sealed class GerasimleoChessRulesEngineAdapter : IChessRulesEngine
         return destinationRank is '8' or '1';
     }
 
+    /// <summary>
+    /// Generates the complete set of legal moves for the side to move in <paramref name="fen"/>.
+    /// The underlying library's <c>Moves()</c> already yields only legal moves — it filters out
+    /// self-check (a move leaving one's own king attacked is never returned) — so the work here is
+    /// to enumerate those moves and expand each pawn promotion into its four legal promotion
+    /// pieces, classifying each move as normal/castling/en-passant/promotion.
+    /// </summary>
+    public IReadOnlyList<LegalMove> GetLegalMoves(string fen)
+    {
+        if (!ChessBoard.TryLoadFromFen(fen, out var board, EnabledDrawRules))
+        {
+            return Array.Empty<LegalMove>();
+        }
+
+        var enPassantTarget = ParseEnPassantTarget(fen);
+        var results = new List<LegalMove>();
+
+        foreach (var move in board.Moves())
+        {
+            var from = move.OriginalPosition.ToString();
+            var to = move.NewPosition.ToString();
+
+            // Resolve the moving piece's type via the board indexer (the same access pattern the
+            // rest of this adapter and the AI rely on). `var` avoids depending on the library's
+            // concrete piece type name, which is not part of the stable seam we expose.
+            var piece = board[from];
+            var pieceType = piece?.Type;
+
+            if (pieceType == PieceType.Pawn)
+            {
+                if (to == enPassantTarget)
+                {
+                    // En-passant: a pawn moving onto the FEN's en-passant target square. The
+                    // library only generates this diagonal pawn move when an enemy pawn was just
+                    // double-pushed, so matching the target square reliably identifies it.
+                    results.Add(new LegalMove(from, to, null, MoveKind.EnPassant));
+                    continue;
+                }
+
+                if (to[^1] is '1' or '8')
+                {
+                    // Promotion: the library generates one entry per reach (defaulting to queen
+                    // when played), but all four promotion pieces are legal for the same from/to
+                    // squares. Expand them so perft and callers see the full move set.
+                    foreach (var promotionPiece in AllPromotions)
+                    {
+                        results.Add(new LegalMove(from, to, promotionPiece, MoveKind.Promotion));
+                    }
+
+                    continue;
+                }
+            }
+
+            var kind = ClassifyMove(pieceType, from, to);
+            results.Add(new LegalMove(from, to, null, kind));
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Distinguishes castling from other king moves. Castling is the only move in which a king
+    /// travels exactly two squares along its back rank toward one of its rooks. En-passant and
+    /// promotion are handled by the caller before this is reached for pawns.
+    /// </summary>
+    private static MoveKind ClassifyMove(PieceType? pieceType, string from, string to)
+    {
+        if (pieceType == PieceType.King)
+        {
+            var fileDelta = Math.Abs(to[0] - from[0]);
+            var rankDelta = Math.Abs(to[1] - from[1]);
+            if (fileDelta == 2 && rankDelta == 0)
+            {
+                return MoveKind.Castling;
+            }
+        }
+
+        return MoveKind.Normal;
+    }
+
+    private static readonly PromotionPieceType[] AllPromotions =
+    {
+        PromotionPieceType.Queen,
+        PromotionPieceType.Rook,
+        PromotionPieceType.Bishop,
+        PromotionPieceType.Knight,
+    };
+
+    private static string? ParseEnPassantTarget(string fen)
+    {
+        var fields = fen.Split(' ');
+        if (fields.Length <= 3)
+        {
+            return null;
+        }
+
+        var target = fields[3];
+        return target == "-" ? null : target;
+    }
+
     private static PieceColor ToEngineColor(PlayerColor color) =>
         color == PlayerColor.White ? PieceColor.White : PieceColor.Black;
 

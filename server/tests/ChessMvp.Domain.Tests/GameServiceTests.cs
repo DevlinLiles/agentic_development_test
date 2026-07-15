@@ -15,11 +15,12 @@ public class GameServiceTests
     private readonly IGameRepository _repository = Substitute.For<IGameRepository>();
     private readonly IChessRulesEngine _rulesEngine = Substitute.For<IChessRulesEngine>();
     private readonly IGameNotifier _notifier = Substitute.For<IGameNotifier>();
+    private readonly IChessAi _ai = Substitute.For<IChessAi>();
     private readonly GameService _sut;
 
     public GameServiceTests()
     {
-        _sut = new GameService(_repository, _rulesEngine, _notifier);
+        _sut = new GameService(_repository, _rulesEngine, _notifier, _ai);
     }
 
     private static Game NewActiveGame(Guid? id = null) => new()
@@ -42,10 +43,40 @@ public class GameServiceTests
         Assert.Equal(GameStatus.WaitingForPlayer2, game.Status);
         Assert.NotNull(game.WhiteSlotToken);
         Assert.Null(game.BlackSlotToken);
+        Assert.False(game.IsVsAi);
         Assert.Equal(ChessConstants.StartingFen, game.CurrentFen);
         Assert.Equal(PlayerColor.White, game.Turn);
         await _repository.Received(1).AddAsync(game);
         await _repository.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task CreateGameAsync_WithAiOpponent_StartsActiveWithAiSeatedAsBlack()
+    {
+        var game = await _sut.CreateGameAsync(GameOpponent.Ai);
+
+        Assert.Equal(GameStatus.Active, game.Status);
+        Assert.True(game.IsVsAi);
+        Assert.NotNull(game.BlackSlotToken);
+        Assert.Equal(PlayerColor.White, game.Turn);
+        await _repository.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task JoinGameAsync_OnAiGame_ThrowsGameNotActiveException()
+    {
+        var game = new Game
+        {
+            Id = Guid.NewGuid(),
+            WhiteSlotToken = WhiteToken,
+            BlackSlotToken = Guid.NewGuid(),
+            Status = GameStatus.Active,
+            IsVsAi = true,
+            CurrentFen = ChessConstants.StartingFen,
+        };
+        _repository.GetByIdAsync(game.Id).Returns(game);
+
+        await Assert.ThrowsAsync<GameNotActiveException>(() => _sut.JoinGameAsync(game.Id));
     }
 
     [Fact]
@@ -277,6 +308,65 @@ public class GameServiceTests
         Assert.Equal(GameResult.Draw, updated.Result);
         Assert.Equal(GameResultReason.FiftyMoveRule, updated.ResultReason);
         Assert.Equal(100, updated.HalfmoveClock);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_InAiGame_PlaysAiReplyWithinSameUnitOfWork()
+    {
+        var game = NewActiveGame();
+        game.IsVsAi = true;
+        game.Turn = PlayerColor.White;
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string afterWhiteFen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+        const string afterAiFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
+
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult { IsLegal = true, San = "e4", ResultingFen = afterWhiteFen });
+        _ai.ChooseMove(afterWhiteFen).Returns(new AiMove("e7", "e5", null));
+        _rulesEngine.IsPromotionMove(afterWhiteFen, "e7", "e5").Returns(false);
+        _rulesEngine.TryApplyMove(afterWhiteFen, PlayerColor.Black, "e7", "e5", null)
+            .Returns(new MoveApplicationResult { IsLegal = true, San = "e5", ResultingFen = afterAiFen });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        // Both plies landed; it's White's turn again.
+        Assert.Equal(2, updated.Moves.Count);
+        Assert.Equal(afterAiFen, updated.CurrentFen);
+        Assert.Equal(PlayerColor.White, updated.Turn);
+        Assert.Equal(PlayerColor.Black, updated.Moves[1].PlyColor);
+        Assert.Equal("e5", updated.Moves[1].San);
+
+        // A single save and a single broadcast cover both plies.
+        await _repository.Received(1).SaveChangesAsync();
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_InAiGame_WhenHumanMoveEndsGame_DoesNotInvokeAi()
+    {
+        var game = NewActiveGame();
+        game.IsVsAi = true;
+        game.Turn = PlayerColor.White;
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string matingFen = "rnb1kbnr/pppp1Q1p/5p2/4p3/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 0 4";
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "d1", "f7", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "Qxf7#",
+                ResultingFen = matingFen,
+                IsCheckmate = true,
+            });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "d1", "f7", null);
+
+        Assert.Equal(GameStatus.Ended, updated.Status);
+        Assert.Equal(GameResult.WhiteWins, updated.Result);
+        Assert.Single(updated.Moves);
+        // The AI must not be asked to move once the game is over.
+        await _ai.DidNotReceive().ChooseMove(Arg.Any<string>());
     }
 
     [Fact]

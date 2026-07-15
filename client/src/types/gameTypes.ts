@@ -19,6 +19,9 @@ export type GameResultReason =
 
 export type PromotionPieceType = "Queen" | "Rook" | "Bishop" | "Knight";
 
+/** Who occupies the black seat when a game is created. */
+export type GameOpponent = "Human" | "Ai";
+
 export interface LastMove {
   from: string;
   to: string;
@@ -35,6 +38,8 @@ export interface GameStateResponse {
   resultReason: GameResultReason | null;
   moveCount: number;
   isCheck: boolean;
+  /** True when the black seat is the heuristic AI opponent (solo play). */
+  isVsAi: boolean;
   lastMove: LastMove | null;
 }
 
@@ -53,11 +58,17 @@ export interface MoveHistoryResponse {
   moves: MoveHistoryEntry[];
 }
 
+export interface CreateGameRequest {
+  opponent: GameOpponent;
+}
+
 export interface CreateGameResponse {
   gameId: string;
   playerToken: string;
   color: PlayerColor;
   joinUrl: string;
+  /** True when the black seat is the heuristic AI opponent (solo play). */
+  isVsAi: boolean;
   gameState: GameStateResponse;
 }
 

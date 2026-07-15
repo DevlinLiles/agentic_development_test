@@ -23,9 +23,13 @@ public class GamesControllerTests
         _client = factory.CreateClient();
     }
 
-    private async Task<(Guid GameId, Guid WhiteToken)> CreateGameAsync()
+    private async Task<(Guid GameId, Guid WhiteToken)> CreateGameAsync(GameOpponent opponent = GameOpponent.Human)
     {
-        var response = await _client.PostAsync("/api/games", content: null);
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/games")
+        {
+            Content = JsonContent.Create(new CreateGameRequest(opponent), options: JsonOptions),
+        };
+        var response = await _client.SendAsync(request);
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
         Assert.NotNull(body);
@@ -60,7 +64,53 @@ public class GamesControllerTests
         var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
         Assert.NotNull(body);
         Assert.Equal(GameStatus.WaitingForPlayer2, body!.GameState.Status);
+        Assert.False(body.IsVsAi);
         Assert.NotEqual(Guid.Empty, body.PlayerToken);
+    }
+
+    [Fact]
+    public async Task CreateGame_WithAiOpponent_StartsActiveAndMarksIsVsAi()
+    {
+        var (gameId, whiteToken) = await CreateGameAsync(GameOpponent.Ai);
+
+        // AI games start active (no waiting-for-player-2 state) and never offer a join link.
+        var state = await _client.GetFromJsonAsync<GameStateResponse>($"/api/games/{gameId}", JsonOptions);
+        Assert.NotNull(state);
+        Assert.Equal(GameStatus.Active, state!.Status);
+        Assert.True(state.IsVsAi);
+        Assert.Equal(PlayerColor.White, state.Turn);
+    }
+
+    [Fact]
+    public async Task JoinGame_OnAiGame_Returns409()
+    {
+        var (gameId, _) = await CreateGameAsync(GameOpponent.Ai);
+
+        var response = await _client.PostAsync($"/api/games/{gameId}/join", content: null);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task AiGame_HumanMoveIsImmediatelyAnsweredByTheAi()
+    {
+        var (gameId, whiteToken) = await CreateGameAsync(GameOpponent.Ai);
+
+        // White plays e4; the server applies it and then the AI's reply in the same round-trip,
+        // so the returned state already shows two plies and it's White's turn again.
+        var moveResponse = await SubmitMoveAsync(gameId, whiteToken, "e2", "e4");
+        Assert.Equal(HttpStatusCode.OK, moveResponse.StatusCode);
+        var state = await moveResponse.Content.ReadFromJsonAsync<GameStateResponse>(JsonOptions);
+        Assert.NotNull(state);
+        Assert.Equal(PlayerColor.White, state!.Turn);
+        Assert.Equal(2, state.MoveCount);
+        Assert.True(state.IsVsAi);
+
+        var history = await _client.GetFromJsonAsync<MoveHistoryResponse>($"/api/games/{gameId}/moves", JsonOptions);
+        Assert.NotNull(history);
+        Assert.Equal(2, history!.Moves.Count);
+        Assert.Equal(PlayerColor.White, history.Moves[0].Color);
+        Assert.Equal(PlayerColor.Black, history.Moves[1].Color);
     }
 
     [Fact]

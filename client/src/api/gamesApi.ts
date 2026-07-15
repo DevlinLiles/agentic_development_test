@@ -4,15 +4,20 @@
 
 import { apiRequest } from "./httpClient";
 import type {
+  CreateGameRequest,
   CreateGameResponse,
   GameStateResponse,
+  GameOpponent,
   JoinGameResponse,
   MoveHistoryResponse,
   PromotionPieceType,
 } from "../types/gameTypes";
 
-export function createGame(): Promise<CreateGameResponse> {
-  return apiRequest<CreateGameResponse>("/api/games", { method: "POST" });
+export function createGame(opponent: GameOpponent = "Human"): Promise<CreateGameResponse> {
+  return apiRequest<CreateGameResponse>("/api/games", {
+    method: "POST",
+    body: { opponent } satisfies CreateGameRequest,
+  });
 }
 
 export function joinGame(gameId: string): Promise<JoinGameResponse> {

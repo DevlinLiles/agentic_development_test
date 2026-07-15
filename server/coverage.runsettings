@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Coverage configuration for the automated QA gate
+  (task: Automated Test-Suite Execution and Coverage Verification).
+
+  Usage (from the server directory):
+      dotnet test ChessMvp.slnx
+          with the settings file below and the "XPlat Code Coverage" collector.
+
+  The XPlat Code Coverage data collector (coverlet) writes a coverage.cobertura.xml report
+  under the results directory. The Threshold / ThresholdType / ThresholdStat triple below is
+  coverlet's built-in aggregate gate: the AVERAGE line coverage across the measured modules
+  must be at least Threshold, otherwise coverlet reports a threshold failure.
+
+  This runsettings threshold is a fast first-line aggregate gate. The authoritative per-module
+  line-coverage gate (every implementation module must independently meet the threshold) and the
+  "no skipped or xfailed tests" gate are enforced deterministically by run-qa-coverage.sh,
+  which parses the cobertura and trx artifacts this run emits.
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <!-- Cobertura is the format the QA script parses; opencover is kept for IDE tooling. -->
+          <Format>cobertura,opencover</Format>
+
+          <!-- Only measure implementation assemblies, never the test assemblies themselves. -->
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+
+          <!-- Exclude the EF Core migration scaffolding and generated designer files: they are
+               not behavioral implementation modules and would only dilute the gate. -->
+          <ExcludeByFile>**/Migrations/*.cs,**/*.Designer.cs</ExcludeByFile>
+
+          <!-- Do not attribute coverage gaps to Source Link or symbol-only assemblies. -->
+          <ExcludeAssembliesWithoutSources>MissingAssemblies</ExcludeAssembliesWithoutSources>
+
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>false</UseSourceLink>
+
+          <!-- Aggregate line-coverage gate. Per-module enforcement lives in run-qa-coverage.sh. -->
+          <Threshold>80</Threshold>
+          <ThresholdType>line</ThresholdType>
+          <ThresholdStat>average</ThresholdStat>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

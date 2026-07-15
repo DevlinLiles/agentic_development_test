@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestRun>
+  <Results>
+    <UnitTestResult testName="A" outcome="Passed" />
+    <UnitTestResult testName="B" outcome="Passed" />
+    <UnitTestResult testName="C" outcome="Failed" />
+  </Results>
+</TestRun>

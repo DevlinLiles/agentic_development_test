@@ -56,6 +56,10 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
+# Python (QA-gate parser regression tests)
+__pycache__/
+*.pyc
+
 # Node / client
 client/node_modules/
 client/dist/

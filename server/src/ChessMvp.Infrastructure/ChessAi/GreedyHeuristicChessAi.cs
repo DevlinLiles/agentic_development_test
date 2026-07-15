@@ -6,16 +6,12 @@ using EngineMove = Chess.Move;
 namespace ChessMvp.Infrastructure.ChessAi;
 
 /// <summary>
-/// A deliberately simple, one-ply greedy chess AI. For every legal move it:
-///   1. applies the move on a throwaway board,
-///   2. scores the resulting position with a material-balance heuristic plus small
-///      check/checkmate bonuses, and
-///   3. picks the highest-scoring move (ties broken deterministically by SAN so repeated runs
-///      are reproducible — essential for unit tests).
-/// This is intentionally not a strong engine — it's a "basic heuristic" opponent per the MVP
-/// scope: it grabs material when it can (the material term rewards captures), plays a mate
-/// whenever one is on the board, and otherwise prefers checking moves. A real search
-/// (minimax/alpha-beta) is left for a later phase; only this class changes if/when that lands.
+/// The computer opponent. For a given FEN it returns exactly one move chosen from
+/// <see cref="ChessBoard.Moves"/>, using a material-balance evaluation plus a fixed-depth
+/// negamax/minimax search (alpha-beta pruned). The selection is guaranteed to be legal under
+/// the move generator, and when the side to move is already in a terminal state (no legal
+/// moves) the AI returns <see langword="null"/> rather than raising — the move that produced
+/// the position already classified the game end via the rules engine.
 /// </summary>
 public sealed class GreedyHeuristicChessAi : IChessAi
 {
@@ -33,36 +29,62 @@ public sealed class GreedyHeuristicChessAi : IChessAi
 
     private const AutoEndgameRules EnabledDrawRules = AutoEndgameRules.FiftyMoveRule;
 
+    // Search depth (plies). Two is enough for a "basic heuristic" opponent per the MVP scope —
+    // it avoids the horizon effect on immediate captures and mates while staying fast on the
+    // API's stateless hot path. Only this constant changes if a stronger engine is wanted.
+    private const int SearchDepth = 2;
+
+    // Mate score sentinel. Mate scores are offset by the search ply so a mate found in fewer
+    // plies always beats one found in more plies (a sooner mate is strictly better).
+    private const int MateScore = 10_000_000;
+
     public AiMove? ChooseMove(string fen)
     {
         if (!ChessBoard.TryLoadFromFen(fen, out var board, EnabledDrawRules))
         {
+            // An unparseable FEN is treated as a terminal/non-playable state: the AI has nothing
+            // to do and must not raise.
             return null;
         }
 
         var legalMoves = board.Moves().ToList();
         if (legalMoves.Count == 0)
         {
-            // No legal moves: terminal position already classified by the rules engine on the
-            // move that produced `fen`. Nothing for the AI to do.
+            // Terminal-state short-circuit: no legal moves means checkmate/stalemate, already
+            // classified by the rules engine on the move that produced `fen`. The AI returns no
+            // move (sentinel) rather than raising.
             return null;
         }
 
-        var sideToMove = board.Turn;
-
         ScoredMove? best = null;
+        // Full-width window at the root; alpha-beta narrows it as we descend.
+        var alpha = int.MinValue + 1;
+        var beta = int.MaxValue - 1;
+
         foreach (var move in legalMoves)
         {
-            var scored = ScoreMove(board, move, sideToMove);
+            // Every move here came straight from the move generator, so it is legal by
+            // construction. We always score it (engine-level failures map to the worst score)
+            // so that, as long as there is at least one legal move, `best` is always set and we
+            // return exactly one move from legal_moves(state).
+            var value = ScoreRootMove(board, move, SearchDepth - 1, -beta, -alpha);
 
-            // Deterministic tie-break on SAN so repeated runs against the same position pick the
-            // same move — essential for unit tests and for reproducible AI games.
             if (best is null
-                || scored.Score > best.Score
-                || (scored.Score == best.Score
-                    && string.CompareOrdinal(scored.San, best.San) < 0))
+                || value > best.Score
+                || (value == best.Score
+                    && string.CompareOrdinal(move.San, best.San) < 0))
             {
-                best = scored;
+                best = new ScoredMove(
+                    move.OriginalPosition.ToString(),
+                    move.NewPosition.ToString(),
+                    move.San,
+                    ResolvePromotion(board, move),
+                    value);
+            }
+
+            if (value > alpha)
+            {
+                alpha = value;
             }
         }
 
@@ -71,57 +93,139 @@ public sealed class GreedyHeuristicChessAi : IChessAi
             : new AiMove(best.From, best.To, best.Promotion);
     }
 
-    private static ScoredMove ScoreMove(ChessBoard board, EngineMove move, PieceColor sideToMove)
+    /// <summary>
+    /// Plays <paramref name="move"/> on a throwaway copy of <paramref name="board"/> and scores
+    /// the resulting position from the root mover's perspective via negamax. The child's score
+    /// is from the opponent's perspective, so it is negated to return the root mover's score.
+    /// </summary>
+    private static int ScoreRootMove(
+        ChessBoard board,
+        EngineMove move,
+        int depth,
+        int alpha,
+        int beta)
     {
-        // Apply on a freshly-loaded board so the caller's board is untouched and we can evaluate
-        // the position *after* our move (which is what a greedy one-ply eval needs).
-        if (!ChessBoard.TryLoadFromFen(board.ToFen(), out var after, EnabledDrawRules))
+        var after = CloneBoard(board);
+        if (after is null)
         {
-            // Should never happen — we just serialised this board — but treat as a worst case.
-            return ScoredMove.Illegal(move);
+            return int.MinValue + 1;
         }
 
-        // The library raises this event for promotions; default to queen, which a greedy one-ply
-        // eval almost always scores highest.
         after.OnPromotePawn += (_, e) => e.PromotionResult = PromotionType.ToQueen;
 
+        bool applied;
         try
         {
-            if (!after.Move(move))
-            {
-                return ScoredMove.Illegal(move);
-            }
+            applied = after.Move(move);
         }
         catch (Exception)
         {
-            // The library throws for some illegal-at-the-engine-level moves; treat as unplayable.
-            return ScoredMove.Illegal(move);
+            return int.MinValue + 1;
         }
 
-        var score = EvaluateMaterial(after, sideToMove);
-
-        // A move that delivers checkmate dominates every other score, so the AI always plays a
-        // mate when one is on the board. `move.IsMate` is set by the library for the move that
-        // produces mate, so we don't need to inspect the post-move endgame struct.
-        if (move.IsMate)
+        if (!applied)
         {
-            score += 10_000_000;
+            return int.MinValue + 1;
         }
 
-        // Small bonus for giving check (encourages forcing moves over quiet ones among
-        // otherwise-equal material positions).
-        if (move.IsCheck)
+        // Terminal positions (e.g. a delivered mate) are detected inside Negamax and scored
+        // accordingly, so a mate here surfaces as +MateScore from the root mover's perspective.
+        return -Negamax(after, depth, -beta, -alpha);
+    }
+
+    /// <summary>
+    /// Negamax with alpha-beta pruning. Returns the score of the position from the perspective
+    /// of the side to move on <paramref name="board"/>. Terminal positions are short-circuited
+    /// before the depth check: checkmate scores a large negative value (worst for the side to
+    /// move), and stalemate/fifty-move draws score zero.
+    /// </summary>
+    private static int Negamax(ChessBoard board, int depth, int alpha, int beta)
+    {
+        var legalMoves = board.Moves().ToList();
+
+        // Terminal-state short-circuit: no legal moves ⇒ checkmate or stalemate/draw.
+        if (legalMoves.Count == 0)
         {
-            score += 50;
+            var endgame = board.EndGame;
+            if (endgame is not null
+                && (endgame.EndgameType == EndgameType.Stalemate
+                    || endgame.EndgameType == EndgameType.FiftyMoveRule))
+            {
+                return 0;
+            }
+
+            // Checkmate (or any non-draw terminal): worst case for the side to move. Offset by
+            // remaining depth so a mate delivered sooner is strictly preferred.
+            return -MateScore + (SearchDepth - depth);
         }
 
-        var promotion = ResolvePromotion(board, move);
-        return new ScoredMove(
-            move.OriginalPosition.ToString(),
-            move.NewPosition.ToString(),
-            move.San,
-            promotion,
-            score);
+        if (depth <= 0)
+        {
+            // Leaf: static material evaluation from the side-to-move's perspective.
+            return EvaluateMaterial(board, board.Turn);
+        }
+
+        var best = int.MinValue + 1;
+        foreach (var move in legalMoves)
+        {
+            var after = CloneBoard(board);
+            if (after is null)
+            {
+                continue;
+            }
+
+            after.OnPromotePawn += (_, e) => e.PromotionResult = PromotionType.ToQueen;
+
+            bool applied;
+            try
+            {
+                applied = after.Move(move);
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            if (!applied)
+            {
+                continue;
+            }
+
+            var value = -Negamax(after, depth - 1, -beta, -alpha);
+
+            if (value > best)
+            {
+                best = value;
+            }
+
+            if (best > alpha)
+            {
+                alpha = best;
+            }
+
+            if (alpha >= beta)
+            {
+                break;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// Loads a fresh <see cref="ChessBoard"/> from <paramref name="board"/>'s FEN so the
+    /// caller's board is never mutated and each searched line is independent. Returns
+    /// <see langword="null"/> only if serialisation somehow fails (shouldn't happen for a board
+    /// the library itself produced).
+    /// </summary>
+    private static ChessBoard? CloneBoard(ChessBoard board)
+    {
+        if (!ChessBoard.TryLoadFromFen(board.ToFen(), out var clone, EnabledDrawRules))
+        {
+            return null;
+        }
+
+        return clone;
     }
 
     /// <summary>
@@ -165,8 +269,7 @@ public sealed class GreedyHeuristicChessAi : IChessAi
     /// <summary>
     /// Determines whether <paramref name="move"/> is a pawn promotion and, if so, reports the
     /// promotion piece. The AI defaults promotions to queen (set in the OnPromotePawn handler
-    /// above) because a queen is almost always the highest-scoring promotion for a greedy
-    /// one-ply eval.
+    /// above) because a queen is almost always the highest-scoring promotion for this eval.
     /// </summary>
     private static PromotionPieceType? ResolvePromotion(ChessBoard board, EngineMove move)
     {
@@ -190,13 +293,5 @@ public sealed class GreedyHeuristicChessAi : IChessAi
         string To,
         string San,
         PromotionPieceType? Promotion,
-        int Score)
-    {
-        public static ScoredMove Illegal(EngineMove move) => new(
-            move.OriginalPosition.ToString(),
-            move.NewPosition.ToString(),
-            move.San,
-            null,
-            int.MinValue);
-    }
+        int Score);
 }

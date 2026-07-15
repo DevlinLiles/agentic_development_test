@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<coverage version="1.0" timestamp="1">
+  <packages>
+    <package name="ChessMvp.Domain.dll">
+      <classes>
+        <class filename="src/ChessMvp.Domain/Services/GameService.cs" name="ChessMvp.Domain.Services.GameService">
+          <lines>
+            <line number="1" type="stmt" hits="1"/>
+            <line number="2" type="stmt" hits="1"/>
+            <line number="3" type="stmt" hits="0"/>
+            <line number="4" type="stmt" hits="1"/>
+            <line number="5" type="method" hits="1"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+    <package name="ChessMvp.Infrastructure.dll">
+      <classes>
+        <class filename="src/ChessMvp.Infrastructure/ChessRulesEngine/GerasimleoChessRulesEngineAdapter.cs" name="ChessMvp.Infrastructure.ChessRulesEngine.GerasimleoChessRulesEngineAdapter">
+          <lines>
+            <line number="1" type="stmt" hits="1"/>
+            <line number="2" type="stmt" hits="1"/>
+            <line number="3" type="stmt" hits="1"/>
+            <line number="4" type="stmt" hits="1"/>
+            <line number="5" type="stmt" hits="0"/>
+          </lines>
+        </class>
+        <class filename="src/ChessMvp.Infrastructure/ChessAi/GreedyHeuristicChessAi.cs" name="ChessMvp.Infrastructure.ChessAi.GreedyHeuristicChessAi">
+          <lines>
+            <line number="1" type="stmt" hits="1"/>
+            <line number="2" type="stmt" hits="1"/>
+            <line number="3" type="stmt" hits="1"/>
+            <line number="4" type="stmt" hits="0"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+    <package name="ChessMvp.Api.dll">
+      <classes>
+        <class filename="src/ChessMvp.Api/Program.cs" name="ChessMvp.Api.Program">
+          <lines>
+            <line number="1" type="stmt" hits="0"/>
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>

@@ -55,6 +55,25 @@ cd client
 npm test
 ```
 
+### Automated test-suite execution & coverage verification (QA gate)
+
+A deterministic gate covers regression for legal move generation, terminal-state detection, evaluation/search, and AI engine legality. It runs the full backend suite, collects line coverage, and **gates on three conditions**:
+
+1. the test suite exits with code 0,
+2. line coverage meets the configured threshold (default **80%**) for **every** implementation module, and
+3. no skipped or xfailed tests remain in the run.
+
+Run it from the repo root:
+
+```
+./server/run-qa-coverage.sh             # uses the default 80% line-coverage threshold
+THRESHOLD=85 ./server/run-qa-coverage.sh # raise the threshold
+```
+
+The gate is driven by `server/coverage.runsettings` (coverlet instrumentation + an aggregate threshold) and `server/run-qa-coverage.sh`, which parses the emitted `coverage.cobertura.xml` and `.trx` artifacts with `python3` (stdlib only) to enforce the per-module coverage and no-skipped-tests conditions. A self-checking `NoSkippedTestsGuardTests` also runs inside the suite to forbid any `Skip`/`Explicit` xUnit attributes deterministically.
+
+> The API integration tests (`ChessMvp.Api.Tests`) use Testcontainers (a real SQL Server container), so this gate needs `docker compose up -d` first, exactly like the E2E tests below.
+
 ### End-to-end tests (Playwright)
 
 `client/e2e/` drives the real app in a real browser against the real running backend — two independent browser contexts play full games against each other, covering the SignalR-synced golden path, promotion, and the join-link/spectator-denial screens. These need the full stack up first:

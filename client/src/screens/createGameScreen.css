@@ -13,13 +13,23 @@
   cursor: pointer;
 }
 
+/* Section heading rendered above each selector group. */
+.create-game-screen__group-heading {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #555;
+}
+
 .create-game-screen__options {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   width: 100%;
   max-width: 22rem;
-  margin: 0.5rem 0;
+  margin: 0.25rem 0;
 }
 
 .create-game-screen__option {

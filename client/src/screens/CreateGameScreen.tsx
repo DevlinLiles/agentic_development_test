@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as gamesApi from "../api/gamesApi";
 import { useGameSession } from "../state/useGameSession";
+import { useCreateGamePreferences } from "../state/useCreateGamePreferences";
 import { describeApiError } from "../utils/describeApiError";
-import type { GameOpponent } from "../types/gameTypes";
+import type { GameOpponent, PlayerColor } from "../types/gameTypes";
 import "./createGameScreen.css";
 
 type OpponentChoice = GameOpponent;
+type ColorChoice = PlayerColor;
 
 const OPPONENT_OPTIONS: ReadonlyArray<{
   value: OpponentChoice;
@@ -25,12 +27,38 @@ const OPPONENT_OPTIONS: ReadonlyArray<{
   },
 ];
 
+const COLOR_OPTIONS: ReadonlyArray<{
+  value: ColorChoice;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "White",
+    label: "White",
+    description: "Move first. Your pieces start on the bottom of the board.",
+  },
+  {
+    value: "Black",
+    label: "Black",
+    description: "Respond to White's opening. Your pieces start on top.",
+  },
+];
+
 export function CreateGameScreen() {
   const navigate = useNavigate();
   const { saveSession } = useGameSession();
-  const [opponent, setOpponent] = useState<OpponentChoice>("Human");
+  const { preferences, setPreferences } = useCreateGamePreferences();
+  const { opponent, color } = preferences;
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleOpponentChange = (next: OpponentChoice): void => {
+    setPreferences({ ...preferences, opponent: next });
+  };
+
+  const handleColorChange = (next: ColorChoice): void => {
+    setPreferences({ ...preferences, color: next });
+  };
 
   const handleCreate = async () => {
     setIsCreating(true);
@@ -52,9 +80,16 @@ export function CreateGameScreen() {
   return (
     <div className="create-game-screen">
       <h1>Online Chess</h1>
-      <p>Start a new game and choose your opponent.</p>
+      <p>Start a new game and choose your opponent and color.</p>
 
-      <div className="create-game-screen__options" role="radiogroup" aria-label="Opponent">
+      <p className="create-game-screen__group-heading" id="opponent-group-label">
+        Opponent
+      </p>
+      <div
+        className="create-game-screen__options"
+        role="radiogroup"
+        aria-labelledby="opponent-group-label"
+      >
         {OPPONENT_OPTIONS.map((option) => {
           const selected = option.value === opponent;
           return (
@@ -67,7 +102,38 @@ export function CreateGameScreen() {
                 name="opponent"
                 value={option.value}
                 checked={selected}
-                onChange={() => setOpponent(option.value)}
+                onChange={() => handleOpponentChange(option.value)}
+              />
+              <span className="create-game-screen__option-label">{option.label}</span>
+              <span className="create-game-screen__option-description">
+                {option.description}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+
+      <p className="create-game-screen__group-heading" id="color-group-label">
+        Your color
+      </p>
+      <div
+        className="create-game-screen__options"
+        role="radiogroup"
+        aria-labelledby="color-group-label"
+      >
+        {COLOR_OPTIONS.map((option) => {
+          const selected = option.value === color;
+          return (
+            <label
+              key={option.value}
+              className={`create-game-screen__option${selected ? " create-game-screen__option--selected" : ""}`}
+            >
+              <input
+                type="radio"
+                name="color"
+                value={option.value}
+                checked={selected}
+                onChange={() => handleColorChange(option.value)}
               />
               <span className="create-game-screen__option-label">{option.label}</span>
               <span className="create-game-screen__option-description">

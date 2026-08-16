@@ -24,9 +24,6 @@ public class ChessDbContext : DbContext
                 .HasMaxLength(100)
                 .IsRequired();
 
-            builder.Property(g => g.IsVsAi)
-                .HasDefaultValue(false);
-
             builder.Property(g => g.Version)
                 .IsRowVersion();
 

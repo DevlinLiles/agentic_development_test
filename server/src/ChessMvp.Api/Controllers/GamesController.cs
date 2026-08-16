@@ -20,14 +20,12 @@ public class GamesController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<CreateGameResponse>> CreateGame([FromBody] CreateGameRequest? request)
+    public async Task<ActionResult<CreateGameResponse>> CreateGame()
     {
-        var opponent = request?.Opponent ?? GameOpponent.Human;
-        var game = await _gameService.CreateGameAsync(opponent);
+        var game = await _gameService.CreateGameAsync();
 
         // The client owns its own origin, so we hand back a relative path rather than guessing
-        // the client's scheme/host from this API request. AI games don't need a join link, but
-        // returning one is harmless and keeps the response shape stable for the client.
+        // the client's scheme/host from this API request.
         var joinUrl = $"/game/{game.Id}";
 
         var response = new CreateGameResponse(
@@ -35,7 +33,6 @@ public class GamesController : ControllerBase
             PlayerToken: game.WhiteSlotToken!.Value,
             Color: PlayerColor.White,
             JoinUrl: joinUrl,
-            IsVsAi: game.IsVsAi,
             GameState: GameStateResponse.FromGame(game, PlayerColor.White));
 
         return CreatedAtAction(nameof(GetGame), new { gameId = game.Id }, response);

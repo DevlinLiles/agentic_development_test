@@ -4,7 +4,7 @@ namespace ChessMvp.Domain.Services;
 
 public interface IGameService
 {
-    Task<Game> CreateGameAsync(GameOpponent opponent = GameOpponent.Human);
+    Task<Game> CreateGameAsync();
 
     Task<Game> JoinGameAsync(Guid gameId);
 

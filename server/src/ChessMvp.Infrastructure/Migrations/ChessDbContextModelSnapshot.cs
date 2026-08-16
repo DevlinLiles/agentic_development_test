@@ -42,11 +42,6 @@ namespace ChessMvp.Infrastructure.Migrations
                     b.Property<int>("HalfmoveClock")
                         .HasColumnType("int");
 
-                    b.Property<bool>("IsVsAi")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
                     b.Property<int?>("Result")
                         .HasColumnType("int");
 

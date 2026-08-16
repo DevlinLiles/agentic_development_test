@@ -16,7 +16,6 @@ function makeGameState(overrides: Partial<GameStateResponse>): GameStateResponse
     resultReason: null,
     moveCount: 0,
     isCheck: false,
-    isVsAi: false,
     lastMove: null,
     ...overrides,
   };

@@ -13,49 +13,6 @@
   cursor: pointer;
 }
 
-.create-game-screen__options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
-  max-width: 22rem;
-  margin: 0.5rem 0;
-}
-
-.create-game-screen__option {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 0.6rem;
-  align-items: start;
-  padding: 0.7rem 0.9rem;
-  border: 1px solid #c4c4c4;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  text-align: left;
-}
-
-.create-game-screen__option--selected {
-  border-color: #1a73e8;
-  background: #e8f0fe;
-}
-
-.create-game-screen__option input[type="radio"] {
-  margin-top: 0.2rem;
-  cursor: pointer;
-}
-
-.create-game-screen__option-label {
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.create-game-screen__option-description {
-  grid-column: 2;
-  color: #555;
-  font-size: 0.85rem;
-}
-
 .create-game-screen__error {
   color: #b3261e;
 }

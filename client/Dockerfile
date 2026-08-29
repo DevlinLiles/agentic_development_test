@@ -33,6 +33,6 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 --start-period=10s \
-  CMD curl --fail http://localhost:80/ || exit 1
+  CMD curl --fail http://127.0.0.1:80/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

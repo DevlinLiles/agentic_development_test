@@ -17,5 +17,41 @@ services:
       retries: 10
       start_period: 20s
 
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: chessmvp-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ConnectionStrings__ChessMvpDb: "Server=sqlserver,1433;Database=ChessMvp;User Id=sa;Password=ChessMvp!Local2026;TrustServerCertificate=True"
+      Cors__ClientOrigin: "http://localhost:5173"
+    ports:
+      - "5112:5112"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    healthcheck:
+      # The API exposes its OpenAPI document at /openapi/v1.json in Development.
+      test: ["CMD", "curl", "--fail", "http://localhost:5112/openapi/v1.json"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: "http://localhost:5112"
+        VITE_HUB_URL: "http://localhost:5112/hubs/game"
+    container_name: chessmvp-client
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   chessmvp-sqldata:

@@ -16,4 +16,13 @@ public interface IHeuristicMoveSelector
     /// exists in <paramref name="fen"/> for <paramref name="sideToMove"/>.
     /// </summary>
     ScoredCapture? SelectBestCapture(string fen, PlayerColor sideToMove);
+
+    /// <summary>
+    /// Returns the legal move with the highest combined score for <paramref name="sideToMove"/>
+    /// in <paramref name="fen"/>. The combined score adds heuristic tie-breakers — check, piece
+    /// development, central control, and a queen-promotion preference — to the capture-stage
+    /// material gain, so ties in material gain are resolved in favour of the more positionally
+    /// desirable move. Returns null when the position has no legal moves.
+    /// </summary>
+    ScoredMove? SelectBestMove(string fen, PlayerColor sideToMove);
 }

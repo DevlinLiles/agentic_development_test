@@ -24,6 +24,14 @@ public class ChessDbContext : DbContext
                 .HasMaxLength(100)
                 .IsRequired();
 
+            builder.Property(g => g.OpponentType)
+                .HasColumnType("int")
+                .IsRequired()
+                .HasDefaultValue(GameOpponentType.Human);
+
+            builder.Property(g => g.AiColor)
+                .HasColumnType("int");
+
             builder.Property(g => g.Version)
                 .IsRowVersion();
 

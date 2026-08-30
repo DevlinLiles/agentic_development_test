@@ -210,6 +210,61 @@ public class GerasimleoChessRulesEngineAdapterTests
         Assert.False(_sut.IsPromotionMove(ChessConstants.StartingFen, "b1", "c3"));
     }
 
+    [Fact]
+    public void GetAllLegalMoves_FromStartingPosition_ReturnsTwentyMoves()
+    {
+        // The starting position has 20 legal moves: 16 pawn pushes (single + double) and 4 knight moves.
+        var moves = _sut.GetAllLegalMoves(ChessConstants.StartingFen, PlayerColor.White);
+
+        Assert.Equal(20, moves.Count);
+        Assert.All(moves, m => Assert.Null(m.Promotion));
+    }
+
+    [Fact]
+    public void GetAllLegalMoves_FromStartingPosition_ContainsKnightAndPawnMoves()
+    {
+        var moves = _sut.GetAllLegalMoves(ChessConstants.StartingFen, PlayerColor.White);
+
+        var byOrigin = moves.ToLookup(m => m.FromSquare, StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal(new HashSet<string> { "a3", "a4" }, byOrigin["a2"].Select(m => m.ToSquare).ToHashSet(StringComparer.OrdinalIgnoreCase));
+        Assert.Equal(new HashSet<string> { "a3", "c2" }, byOrigin["b1"].Select(m => m.ToSquare).ToHashSet(StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void GetAllLegalMoves_WrongSideToMove_ReturnsEmpty()
+    {
+        // Starting FEN has White to move; asking for Black's moves yields nothing.
+        var moves = _sut.GetAllLegalMoves(ChessConstants.StartingFen, PlayerColor.Black);
+
+        Assert.Empty(moves);
+    }
+
+    [Fact]
+    public void GetAllLegalMoves_InvalidFen_ReturnsEmpty()
+    {
+        var moves = _sut.GetAllLegalMoves("not a fen", PlayerColor.White);
+
+        Assert.Empty(moves);
+    }
+
+    [Fact]
+    public void GetAllLegalMoves_PromotionPosition_ReturnsOneEntryPerPromotionPiece()
+    {
+        // White pawn on e7 can promote on e8; the engine emits four moves (Q/R/B/N).
+        const string fen = "k7/4P3/8/8/8/8/8/4K3 w - - 0 1";
+
+        var moves = _sut.GetAllLegalMoves(fen, PlayerColor.White)
+            .Where(m => string.Equals(m.ToSquare, "e8", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        Assert.Equal(4, moves.Count);
+        Assert.All(moves, m => Assert.Equal("e7", m.FromSquare, StringComparer.OrdinalIgnoreCase));
+        Assert.Equal(
+            new HashSet<PromotionPieceType> { PromotionPieceType.Queen, PromotionPieceType.Rook, PromotionPieceType.Bishop, PromotionPieceType.Knight },
+            moves.Select(m => m.Promotion).ToHashSet());
+    }
+
     private string Apply(string fen, PlayerColor color, string from, string to)
     {
         var result = _sut.TryApplyMove(fen, color, from, to, null);

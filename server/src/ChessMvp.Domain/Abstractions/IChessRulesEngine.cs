@@ -18,4 +18,11 @@ public interface IChessRulesEngine
     IReadOnlySet<string> GetLegalDestinations(string fen, string fromSquare);
 
     bool IsPromotionMove(string fen, string fromSquare, string toSquare);
+
+    /// <summary>
+    /// Returns every legal move for the side to move in the given position. The FEN already
+    /// encodes whose turn it is; <paramref name="sideToMove"/> is supplied so callers can guard
+    /// against querying the wrong side, and implementations must filter to that side.
+    /// </summary>
+    IReadOnlyList<LegalMove> GetAllLegalMoves(string fen, PlayerColor sideToMove);
 }

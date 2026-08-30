@@ -100,6 +100,58 @@ public sealed class GerasimleoChessRulesEngineAdapter : IChessRulesEngine
         return destinationRank is '8' or '1';
     }
 
+    public IReadOnlyList<LegalMove> GetAllLegalMoves(string fen, PlayerColor sideToMove)
+    {
+        if (!ChessBoard.TryLoadFromFen(fen, out var board, EnabledDrawRules))
+        {
+            return Array.Empty<LegalMove>();
+        }
+
+        // Turn filtering: board.Moves() only generates moves for board.Turn (the side encoded in
+        // the FEN). If that does not match the side the caller asked about, there is nothing legal
+        // to report for that side, so we short-circuit rather than hand back the opponent's moves.
+        if (board.Turn != ToEngineColor(sideToMove))
+        {
+            return Array.Empty<LegalMove>();
+        }
+
+        return board.Moves()
+            .Select(ToLegalMove)
+            .ToList();
+    }
+
+    private static LegalMove ToLegalMove(EngineMove move) => new()
+    {
+        FromSquare = move.OriginalPosition.ToString(),
+        ToSquare = move.NewPosition.ToString(),
+        // The engine emits one Move per promotion piece type (e.g. "e8=Q", "e8=R"); the promotion
+        // kind is only present in the SAN, so it is parsed back out here.
+        Promotion = ParsePromotion(move.San),
+    };
+
+    private static PromotionPieceType? ParsePromotion(string? san)
+    {
+        if (string.IsNullOrEmpty(san))
+        {
+            return null;
+        }
+
+        var equalsIndex = san.IndexOf('=');
+        if (equalsIndex < 0 || equalsIndex + 1 >= san.Length)
+        {
+            return null;
+        }
+
+        return san[equalsIndex + 1] switch
+        {
+            'Q' => PromotionPieceType.Queen,
+            'R' => PromotionPieceType.Rook,
+            'B' => PromotionPieceType.Bishop,
+            'N' => PromotionPieceType.Knight,
+            _ => null,
+        };
+    }
+
     private static PieceColor ToEngineColor(PlayerColor color) =>
         color == PlayerColor.White ? PieceColor.White : PieceColor.Black;
 

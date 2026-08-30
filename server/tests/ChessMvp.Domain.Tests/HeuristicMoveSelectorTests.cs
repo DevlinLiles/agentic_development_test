@@ -53,9 +53,7 @@ public class HeuristicMoveSelectorTests
         // (gain 800). A quiet push to e5 is also legal but must not be selected.
         const string fen = "k7/8/8/3r1q2/4P3/8/8/4K3 w - - 0 1";
 
-        var result = _sut.SelectBestCapture(fen, PlayerColor.Black == PlayerColor.White ? PlayerColor.Black : PlayerColor.White);
-        // The position above is White to move; exercise it as White.
-        result = _sut.SelectBestCapture(fen, PlayerColor.White);
+        var result = _sut.SelectBestCapture(fen, PlayerColor.White);
 
         Assert.NotNull(result);
         Assert.Equal("e4", result!.Move.FromSquare, StringComparer.OrdinalIgnoreCase);
@@ -147,10 +145,11 @@ public class HeuristicMoveSelectorTests
     [Fact]
     public void SelectBestMove_Check_IsScoredAsPositiveTieBreaker()
     {
-        // White rook on h5 (already off its home rank, so no development bonus) can move to a8 or
-        // h8 along the files/ranks; both Ra5 and Rh8 deliver check to the black king on a8, while
-        // the remaining rook moves are quiet. Every relevant move has zero material gain, zero
-        // development and zero central-control change, so check is the sole deciding tie-breaker.
+        // White rook on h5 (already off its home rank, so no development bonus) can move along the
+        // h-file and the fifth rank; moving it to the eighth rank (Rh8) or to a5 delivers check
+        // to the black king on a8, while the remaining rook moves are quiet. Every relevant move
+        // has zero material gain, zero development and zero central-control change, so check is
+        // the sole deciding tie-breaker.
         const string fen = "k7/8/8/8/7R/8/8/4K3 w - - 0 1";
 
         var result = _sut.SelectBestMove(fen, PlayerColor.White);
@@ -222,9 +221,10 @@ public class HeuristicMoveSelectorTests
     [Fact]
     public void SelectBestMove_TieBreakers_ResolveEqualMaterialGain()
     {
-        // Two white pawns can each capture a black queen (gain 900 - 100 = 800). Both captures
-        // improve central control by the same amount, but only c4xd5 gives check (the d5 pawn
-        // attacks the black king on e6). The check tie-breaker breaks the material-gain tie.
+        // Two white pawns can each capture a black queen (gain 900 - 100 = 800): c4xd5 and f4xe5
+        // are both legal diagonal captures. Both improve central control by the same amount, but
+        // only c4xd5 gives check — the white pawn landing on d5 attacks the black king on e6.
+        // The check tie-breaker breaks the material-gain tie in favour of d5.
         const string fen = "8/8/4k3/3qq3/2P2P2/8/8/7K w - - 0 1";
 
         var result = _sut.SelectBestMove(fen, PlayerColor.White);

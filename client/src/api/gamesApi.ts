@@ -11,8 +11,14 @@ import type {
   PromotionPieceType,
 } from "../types/gameTypes";
 
+/** Create a two-human game. Returns a WaitingForPlayer2 game and a shareable join link. */
 export function createGame(): Promise<CreateGameResponse> {
   return apiRequest<CreateGameResponse>("/api/games", { method: "POST" });
+}
+
+/** Create an AI-opponent game. Returns an immediately Active game with no join link. */
+export function createAiGame(): Promise<CreateGameResponse> {
+  return apiRequest<CreateGameResponse>("/api/games/ai", { method: "POST" });
 }
 
 export function joinGame(gameId: string): Promise<JoinGameResponse> {

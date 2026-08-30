@@ -19,6 +19,11 @@ export type GameResultReason =
 
 export type PromotionPieceType = "Queen" | "Rook" | "Bishop" | "Knight";
 
+// Distinguishes a human-opponent game (the original share-link flow) from an
+// AI-opponent game (single-user play). The server serializes the .NET
+// `OpponentType` enum as this string union via JsonStringEnumConverter.
+export type OpponentType = "Human" | "Ai";
+
 export interface LastMove {
   from: string;
   to: string;
@@ -36,6 +41,7 @@ export interface GameStateResponse {
   moveCount: number;
   isCheck: boolean;
   lastMove: LastMove | null;
+  opponentType: OpponentType;
 }
 
 export interface MoveHistoryEntry {
@@ -57,7 +63,9 @@ export interface CreateGameResponse {
   gameId: string;
   playerToken: string;
   color: PlayerColor;
-  joinUrl: string;
+  // Relative path for human games; null for AI games (no second seat to join).
+  joinUrl: string | null;
+  opponentType: OpponentType;
   gameState: GameStateResponse;
 }
 

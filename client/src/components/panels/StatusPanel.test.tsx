@@ -17,6 +17,7 @@ function makeGameState(overrides: Partial<GameStateResponse>): GameStateResponse
     moveCount: 0,
     isCheck: false,
     lastMove: null,
+    opponentType: "Human",
     ...overrides,
   };
 }
@@ -101,5 +102,49 @@ describe("StatusPanel", () => {
       />,
     );
     expect(screen.getByText("Draw — Fifty-move rule")).toBeInTheDocument();
+  });
+
+  it("renders 'AI is thinking…' when it's the AI's turn in an AI game", () => {
+    render(
+      <StatusPanel
+        gameState={makeGameState({
+          status: "Active",
+          turn: "Black",
+          yourColor: "White",
+          opponentType: "Ai",
+        })}
+      />,
+    );
+    expect(screen.getByText("AI is thinking…")).toBeInTheDocument();
+    expect(screen.queryByText("Opponent's turn")).not.toBeInTheDocument();
+  });
+
+  it("renders 'Your turn' when it's the human's turn in an AI game", () => {
+    render(
+      <StatusPanel
+        gameState={makeGameState({
+          status: "Active",
+          turn: "White",
+          yourColor: "White",
+          opponentType: "Ai",
+        })}
+      />,
+    );
+    expect(screen.getByText("Your turn")).toBeInTheDocument();
+  });
+
+  it("still uses 'Opponent's turn' wording for a human game even when it isn't the player's turn", () => {
+    render(
+      <StatusPanel
+        gameState={makeGameState({
+          status: "Active",
+          turn: "Black",
+          yourColor: "White",
+          opponentType: "Human",
+        })}
+      />,
+    );
+    expect(screen.getByText("Opponent's turn")).toBeInTheDocument();
+    expect(screen.queryByText("AI is thinking…")).not.toBeInTheDocument();
   });
 });

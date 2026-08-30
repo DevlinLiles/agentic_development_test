@@ -18,6 +18,10 @@ public class Game
 
     public GameResultReason? ResultReason { get; set; }
 
+    public GameOpponentType OpponentType { get; set; } = GameOpponentType.Human;
+
+    public PlayerColor? AiColor { get; set; }
+
     public int HalfmoveClock { get; set; }
 
     public DateTime CreatedUtc { get; set; }

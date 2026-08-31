@@ -17,21 +17,51 @@ public sealed class GameService : IGameService
         _notifier = notifier;
     }
 
-    public async Task<Game> CreateGameAsync()
+    public async Task<Game> CreateGameAsync(GameOpponentType mode, PlayerColor? opponent = null)
     {
         var now = DateTime.UtcNow;
+
         var game = new Game
         {
             Id = Guid.NewGuid(),
-            WhiteSlotToken = Guid.NewGuid(),
-            BlackSlotToken = null,
             CurrentFen = ChessConstants.StartingFen,
             Turn = PlayerColor.White,
-            Status = GameStatus.WaitingForPlayer2,
             HalfmoveClock = 0,
+            OpponentType = mode,
             CreatedUtc = now,
             UpdatedUtc = now,
         };
+
+        if (mode == GameOpponentType.Ai)
+        {
+            // The AI takes the requested seat (defaulting to Black so the human plays White), the
+            // human is seated opposite, and the game starts immediately — there is no second
+            // player to wait for.
+            var aiColor = opponent ?? PlayerColor.Black;
+            var humanColor = aiColor == PlayerColor.White ? PlayerColor.Black : PlayerColor.White;
+
+            game.AiColor = aiColor;
+            game.Status = GameStatus.Active;
+
+            AssignSeat(game, humanColor, Guid.NewGuid());
+
+            // The AI seat needs a token too so SubmitMoveAsync's slot-token resolution and turn
+            // logic treat both seats symmetrically; the AI's moves are driven by the service layer
+            // rather than an HTTP client, but a stable non-null slot token keeps the contract
+            // uniform and lets a human never be handed the AI's token.
+            AssignSeat(game, aiColor, Guid.NewGuid());
+        }
+        else
+        {
+            // Human-vs-human: the creator takes White and waits for a second player to join, as
+            // before. OpponentType defaults to Human on the entity, but set it explicitly for
+            // clarity regardless of any caller-provided opponent color.
+            game.OpponentType = GameOpponentType.Human;
+            game.AiColor = null;
+            game.Status = GameStatus.WaitingForPlayer2;
+            game.WhiteSlotToken = Guid.NewGuid();
+            game.BlackSlotToken = null;
+        }
 
         await _repository.AddAsync(game);
         await _repository.SaveChangesAsync();
@@ -76,6 +106,31 @@ public sealed class GameService : IGameService
 
         var resolvedColor = ResolveSlotToken(game, slotToken);
 
+        return await ApplyMoveAsync(game, resolvedColor, fromSquare, toSquare, promotion);
+    }
+
+    public async Task<IReadOnlyList<Move>> GetMoveHistoryAsync(Guid gameId)
+    {
+        // Confirm the game exists so callers get a 404-mappable exception instead of an empty list.
+        _ = await _repository.GetByIdAsync(gameId) ?? throw new GameNotFoundException(gameId);
+
+        return await _repository.GetMovesAsync(gameId);
+    }
+
+    /// <summary>
+    /// Applies a move to an already-loaded <paramref name="game"/> on behalf of <paramref name="resolvedColor"/>.
+    /// This is the shared move-application helper used by <see cref="SubmitMoveAsync"/> and made available to
+    /// other entry points (such as <see cref="CreateGameAsync"/>) that already hold a loaded game entity.
+    /// It validates the move, updates the board state, toggles the active player, records the move,
+    /// resolves any terminal game status, persists the game, and notifies observers.
+    /// </summary>
+    private async Task<Game> ApplyMoveAsync(
+        Game game,
+        PlayerColor resolvedColor,
+        string fromSquare,
+        string toSquare,
+        PromotionPieceType? promotion)
+    {
         if (game.Status != GameStatus.Active)
         {
             throw new GameNotActiveException("This game is not currently active.");
@@ -150,12 +205,16 @@ public sealed class GameService : IGameService
         return game;
     }
 
-    public async Task<IReadOnlyList<Move>> GetMoveHistoryAsync(Guid gameId)
+    private static void AssignSeat(Game game, PlayerColor color, Guid token)
     {
-        // Confirm the game exists so callers get a 404-mappable exception instead of an empty list.
-        _ = await _repository.GetByIdAsync(gameId) ?? throw new GameNotFoundException(gameId);
-
-        return await _repository.GetMovesAsync(gameId);
+        if (color == PlayerColor.White)
+        {
+            game.WhiteSlotToken = token;
+        }
+        else
+        {
+            game.BlackSlotToken = token;
+        }
     }
 
     private static PlayerColor ResolveSlotToken(Game game, Guid slotToken)

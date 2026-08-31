@@ -20,15 +20,16 @@ public sealed class GameService : IGameService
     public async Task<Game> CreateGameAsync()
     {
         var now = DateTime.UtcNow;
+
         var game = new Game
         {
             Id = Guid.NewGuid(),
-            WhiteSlotToken = Guid.NewGuid(),
-            BlackSlotToken = null,
             CurrentFen = ChessConstants.StartingFen,
             Turn = PlayerColor.White,
-            Status = GameStatus.WaitingForPlayer2,
             HalfmoveClock = 0,
+            Status = GameStatus.WaitingForPlayer2,
+            WhiteSlotToken = Guid.NewGuid(),
+            BlackSlotToken = null,
             CreatedUtc = now,
             UpdatedUtc = now,
         };
@@ -76,6 +77,31 @@ public sealed class GameService : IGameService
 
         var resolvedColor = ResolveSlotToken(game, slotToken);
 
+        return await ApplyMoveAsync(game, resolvedColor, fromSquare, toSquare, promotion);
+    }
+
+    public async Task<IReadOnlyList<Move>> GetMoveHistoryAsync(Guid gameId)
+    {
+        // Confirm the game exists so callers get a 404-mappable exception instead of an empty list.
+        _ = await _repository.GetByIdAsync(gameId) ?? throw new GameNotFoundException(gameId);
+
+        return await _repository.GetMovesAsync(gameId);
+    }
+
+    /// <summary>
+    /// Applies a move to an already-loaded <paramref name="game"/> on behalf of <paramref name="resolvedColor"/>.
+    /// This is the shared move-application helper used by <see cref="SubmitMoveAsync"/> and made available to
+    /// other entry points that already hold a loaded game entity. It validates the move, updates the board
+    /// state, toggles the active player, records the move, resolves any terminal game status, persists the
+    /// game, and notifies observers.
+    /// </summary>
+    private async Task<Game> ApplyMoveAsync(
+        Game game,
+        PlayerColor resolvedColor,
+        string fromSquare,
+        string toSquare,
+        PromotionPieceType? promotion)
+    {
         if (game.Status != GameStatus.Active)
         {
             throw new GameNotActiveException("This game is not currently active.");
@@ -148,14 +174,6 @@ public sealed class GameService : IGameService
         }
 
         return game;
-    }
-
-    public async Task<IReadOnlyList<Move>> GetMoveHistoryAsync(Guid gameId)
-    {
-        // Confirm the game exists so callers get a 404-mappable exception instead of an empty list.
-        _ = await _repository.GetByIdAsync(gameId) ?? throw new GameNotFoundException(gameId);
-
-        return await _repository.GetMovesAsync(gameId);
     }
 
     private static PlayerColor ResolveSlotToken(Game game, Guid slotToken)

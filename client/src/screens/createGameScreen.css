@@ -7,6 +7,13 @@
   text-align: center;
 }
 
+.create-game-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
 .create-game-screen button {
   font-size: 1.1rem;
   padding: 0.6rem 1.5rem;

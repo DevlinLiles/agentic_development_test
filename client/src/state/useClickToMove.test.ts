@@ -24,6 +24,7 @@ function makeGameState(overrides: Partial<GameStateResponse> = {}): GameStateRes
     moveCount: 0,
     isCheck: false,
     lastMove: null,
+    opponentType: "Human",
     ...overrides,
   };
 }

@@ -1,6 +1,7 @@
 // Renders purely from a GameStateResponse. No client-side rules evaluation
 // happens here — every displayed fact comes straight from the response
-// fields (status, turn, yourColor, isCheck, result, resultReason).
+// fields (status, turn, yourColor, isCheck, result, resultReason,
+// opponentType).
 
 import type { GameStateResponse } from "../../types/gameTypes";
 import "./statusPanel.css";
@@ -32,7 +33,7 @@ function terminalMessage(gameState: GameStateResponse): string | null {
 }
 
 export function StatusPanel({ gameState }: StatusPanelProps) {
-  const { status, turn, yourColor, isCheck } = gameState;
+  const { status, turn, yourColor, isCheck, opponentType } = gameState;
 
   if (status === "Ended") {
     const message = terminalMessage(gameState);
@@ -52,7 +53,13 @@ export function StatusPanel({ gameState }: StatusPanelProps) {
   }
 
   // status === "Active"
-  const turnMessage = turn === yourColor ? "Your turn" : "Opponent's turn";
+  const isAiGame = opponentType === "Ai";
+  const turnMessage =
+    turn === yourColor
+      ? "Your turn"
+      : isAiGame
+        ? "AI is thinking…"
+        : "Opponent's turn";
 
   return (
     <div className="status-panel status-panel--active" role="status">

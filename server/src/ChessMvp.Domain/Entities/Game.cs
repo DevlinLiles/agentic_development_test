@@ -14,6 +14,13 @@ public class Game
 
     public GameStatus Status { get; set; } = GameStatus.WaitingForPlayer2;
 
+    /// <summary>
+    /// Who occupies the opposing seat: a waiting human (the share-link flow)
+    /// or the built-in AI. Defaults to <see cref="OpponentType.Human"/> so the
+    /// original two-player behaviour is preserved when no mode is requested.
+    /// </summary>
+    public OpponentType OpponentType { get; set; } = OpponentType.Human;
+
     public GameResult? Result { get; set; }
 
     public GameResultReason? ResultReason { get; set; }

@@ -17,17 +17,24 @@ public sealed class GameService : IGameService
         _notifier = notifier;
     }
 
-    public async Task<Game> CreateGameAsync()
+    public async Task<Game> CreateGameAsync(OpponentType opponentType = OpponentType.Human)
     {
         var now = DateTime.UtcNow;
+        var isAiGame = opponentType == OpponentType.Ai;
+
+        // An AI game is single-user: the human takes White and the AI seat
+        // (Black) is reserved up front so the game starts Active with no
+        // shareable join link. A human game stays WaitingForPlayer2 until a
+        // second player joins via JoinGameAsync.
         var game = new Game
         {
             Id = Guid.NewGuid(),
             WhiteSlotToken = Guid.NewGuid(),
-            BlackSlotToken = null,
+            BlackSlotToken = isAiGame ? Guid.NewGuid() : null,
             CurrentFen = ChessConstants.StartingFen,
             Turn = PlayerColor.White,
-            Status = GameStatus.WaitingForPlayer2,
+            Status = isAiGame ? GameStatus.Active : GameStatus.WaitingForPlayer2,
+            OpponentType = opponentType,
             HalfmoveClock = 0,
             CreatedUtc = now,
             UpdatedUtc = now,

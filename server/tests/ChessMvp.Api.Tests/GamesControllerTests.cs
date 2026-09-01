@@ -61,6 +61,27 @@ public class GamesControllerTests
         Assert.NotNull(body);
         Assert.Equal(GameStatus.WaitingForPlayer2, body!.GameState.Status);
         Assert.NotEqual(Guid.Empty, body.PlayerToken);
+        Assert.Equal(OpponentType.Human, body.OpponentType);
+        Assert.NotNull(body.JoinUrl);
+        Assert.Equal(OpponentType.Human, body.GameState.OpponentType);
+    }
+
+    [Fact]
+    public async Task CreateAiGame_ReturnsImmediatelyActiveGameWithNoJoinLink()
+    {
+        // The AI-opponent flow is single-user: the game must start Active, expose the AI as
+        // the opponent type, and hand back no shareable join link (there is no second seat).
+        var response = await _client.PostAsync("/api/games/ai", content: null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameStatus.Active, body!.GameState.Status);
+        Assert.Equal(PlayerColor.White, body.Color);
+        Assert.NotEqual(Guid.Empty, body.PlayerToken);
+        Assert.Equal(OpponentType.Ai, body.OpponentType);
+        Assert.Null(body.JoinUrl);
+        Assert.Equal(OpponentType.Ai, body.GameState.OpponentType);
     }
 
     [Fact]

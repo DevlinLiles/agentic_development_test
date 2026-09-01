@@ -19,10 +19,12 @@ public class GamesController : ControllerBase
         _gameService = gameService;
     }
 
+    // Create a two-human game: starts WaitingForPlayer2 and returns a
+    // shareable join link the creator forwards to their opponent.
     [HttpPost]
     public async Task<ActionResult<CreateGameResponse>> CreateGame()
     {
-        var game = await _gameService.CreateGameAsync();
+        var game = await _gameService.CreateGameAsync(OpponentType.Human);
 
         // The client owns its own origin, so we hand back a relative path rather than guessing
         // the client's scheme/host from this API request.
@@ -33,6 +35,26 @@ public class GamesController : ControllerBase
             PlayerToken: game.WhiteSlotToken!.Value,
             Color: PlayerColor.White,
             JoinUrl: joinUrl,
+            OpponentType: game.OpponentType,
+            GameState: GameStateResponse.FromGame(game, PlayerColor.White));
+
+        return CreatedAtAction(nameof(GetGame), new { gameId = game.Id }, response);
+    }
+
+    // Create a single-user game against the built-in AI: starts Active
+    // immediately with the AI occupying the Black seat, so there is no join
+    // link to share.
+    [HttpPost("ai")]
+    public async Task<ActionResult<CreateGameResponse>> CreateAiGame()
+    {
+        var game = await _gameService.CreateGameAsync(OpponentType.Ai);
+
+        var response = new CreateGameResponse(
+            GameId: game.Id,
+            PlayerToken: game.WhiteSlotToken!.Value,
+            Color: PlayerColor.White,
+            JoinUrl: null,
+            OpponentType: game.OpponentType,
             GameState: GameStateResponse.FromGame(game, PlayerColor.White));
 
         return CreatedAtAction(nameof(GetGame), new { gameId = game.Id }, response);

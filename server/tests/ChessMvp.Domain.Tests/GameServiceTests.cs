@@ -44,6 +44,25 @@ public class GameServiceTests
         Assert.Null(game.BlackSlotToken);
         Assert.Equal(ChessConstants.StartingFen, game.CurrentFen);
         Assert.Equal(PlayerColor.White, game.Turn);
+        Assert.Equal(OpponentType.Human, game.OpponentType);
+        await _repository.Received(1).AddAsync(game);
+        await _repository.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task CreateGameAsync_AiOpponent_ReturnsActiveGameWithReservedBlackSeat()
+    {
+        // An AI game is single-user: it must start Active (no waiting room) and reserve the
+        // Black seat up front so the AI always has a stable token to act under.
+        var game = await _sut.CreateGameAsync(OpponentType.Ai);
+
+        Assert.Equal(GameStatus.Active, game.Status);
+        Assert.NotNull(game.WhiteSlotToken);
+        Assert.NotNull(game.BlackSlotToken);
+        Assert.NotEqual(game.WhiteSlotToken, game.BlackSlotToken);
+        Assert.Equal(PlayerColor.White, game.Turn);
+        Assert.Equal(OpponentType.Ai, game.OpponentType);
+        Assert.Equal(ChessConstants.StartingFen, game.CurrentFen);
         await _repository.Received(1).AddAsync(game);
         await _repository.Received(1).SaveChangesAsync();
     }

@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGameRepository, GameRepository>();
         services.AddSingleton<IChessRulesEngine, GerasimleoChessRulesEngineAdapter>();
         services.AddSingleton<IHeuristicMoveSelector, HeuristicMoveSelector>();
+        services.AddSingleton<IChessAiPlayer, HeuristicChessAiPlayer>();
 
         return services;
     }

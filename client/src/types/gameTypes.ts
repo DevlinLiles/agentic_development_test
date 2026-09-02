@@ -21,7 +21,12 @@ export type PromotionPieceType = "Queen" | "Rook" | "Bishop" | "Knight";
 
 // Whether the second seat is a human (waits for a join) or the computer (the
 // game starts immediately as Active with the AI taking the requested seat).
+// Mirrors the server-side `GameOpponentType` enum (Human, Ai) and doubles as
+// the game "mode" (human-vs-human vs. human-vs-AI) surfaced through the API.
 export type GameOpponentType = "Human" | "Ai";
+
+// Backward-compatible alias; older call sites still import `OpponentType`.
+export type OpponentType = GameOpponentType;
 
 export interface LastMove {
   from: string;
@@ -65,10 +70,12 @@ export interface MoveHistoryResponse {
 // Request body for POST /api/games. Both fields are optional server-side
 // (defaulting to a human game where the creator plays White); pass `Ai` to
 // start an AI game, and `mode` to pick the side the creator plays (the AI
-// takes the opposite seat).
+// takes the opposite seat). Omitting the body (or leaving the fields null)
+// keeps the historical human-vs-human default, so existing callers that POST
+// an empty body are unaffected.
 export interface CreateGameRequest {
-  opponent?: GameOpponentType;
-  mode?: PlayerColor;
+  opponent?: GameOpponentType | null;
+  mode?: PlayerColor | null;
 }
 
 export interface CreateGameResponse {

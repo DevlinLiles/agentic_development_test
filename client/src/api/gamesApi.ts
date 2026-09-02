@@ -7,8 +7,10 @@ import type {
   CreateGameRequest,
   CreateGameResponse,
   GameStateResponse,
+  GameOpponentType,
   JoinGameResponse,
   MoveHistoryResponse,
+  PlayerColor,
   PromotionPieceType,
 } from "../types/gameTypes";
 
@@ -16,11 +18,30 @@ import type {
 // human-vs-human game that waits for a second player to join. Pass an
 // `opponent` of "Ai" (and a `mode` for the creator's side) to start an AI
 // game, which the server creates as Active with the AI on the opposite seat.
-export function createGame(request?: CreateGameRequest): Promise<CreateGameResponse> {
+// The `request` body is forwarded verbatim to POST /api/games so the server
+// can pick the opponent mode (`opponent`: "Human" | "Ai") and, for AI games,
+// which color the creator plays (`mode`). Omitting the request keeps the
+// historical human-vs-human default, so existing callers that POST an empty
+// body are unaffected.
+export function createGame(request?: CreateGameRequest | null): Promise<CreateGameResponse> {
   return apiRequest<CreateGameResponse>("/api/games", {
     method: "POST",
-    body: request,
+    body: request ?? {},
   });
+}
+
+/**
+ * Convenience overload for callers that only care about the opponent/mode.
+ * Forwards `{ opponent, mode: null }` to POST /api/games. For AI games the
+ * server assigns the AI to the seat opposite `mode` (defaulting the creator to
+ * White when `mode` is omitted/null), so omitting `mode` mirrors the original
+ * human-plays-White behaviour.
+ */
+export function createGameWithMode(
+  opponent: GameOpponentType,
+  mode?: PlayerColor | null,
+): Promise<CreateGameResponse> {
+  return createGame({ opponent, mode: mode ?? null });
 }
 
 export function joinGame(gameId: string): Promise<JoinGameResponse> {

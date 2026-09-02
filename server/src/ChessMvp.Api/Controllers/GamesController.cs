@@ -57,6 +57,10 @@ public class GamesController : ControllerBase
         {
             return NotFound(new ErrorResponse("GameNotFound"));
         }
+        catch (GameIsAiOpponentException ex)
+        {
+            return Conflict(new ErrorResponse("GameIsAiOpponent", ex.Message));
+        }
         catch (GameNotActiveException ex)
         {
             return Conflict(new ErrorResponse("GameNotActive", ex.Message));

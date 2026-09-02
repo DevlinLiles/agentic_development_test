@@ -57,6 +57,27 @@ public class GameServiceTests
     }
 
     [Fact]
+    public async Task JoinGameAsync_AiOpponentGame_ThrowsGameIsAiOpponentException()
+    {
+        var game = new Game
+        {
+            Id = Guid.NewGuid(),
+            WhiteSlotToken = WhiteToken,
+            BlackSlotToken = null,
+            Status = GameStatus.WaitingForPlayer2,
+            CurrentFen = ChessConstants.StartingFen,
+            OpponentType = GameOpponentType.Ai,
+        };
+        _repository.GetByIdAsync(game.Id).Returns(game);
+
+        await Assert.ThrowsAsync<GameIsAiOpponentException>(() => _sut.JoinGameAsync(game.Id));
+
+        // The guard must run before any state mutation, so nothing should have been persisted.
+        await _repository.DidNotReceive().SaveChangesAsync();
+        await _notifier.DidNotReceive().NotifyGameUpdatedAsync(Arg.Any<Game>());
+    }
+
+    [Fact]
     public async Task JoinGameAsync_AlreadyFull_ThrowsGameNotActiveException()
     {
         var game = NewActiveGame();

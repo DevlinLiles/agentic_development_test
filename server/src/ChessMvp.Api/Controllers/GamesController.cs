@@ -20,20 +20,35 @@ public class GamesController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<CreateGameResponse>> CreateGame()
+    public async Task<ActionResult<CreateGameResponse>> CreateGame([FromBody] CreateGameRequest? request)
     {
-        var game = await _gameService.CreateGameAsync();
+        // A null body is valid: it creates the original human-vs-human game that waits for player 2.
+        var opponent = request?.OpponentValue ?? GameOpponentType.Human;
+        var mode = request?.ModeValue ?? PlayerColor.White;
+
+        var game = await _gameService.CreateGameAsync(opponent, mode);
+
+        // For human-vs-human the creator always plays White; for AI games the creator plays the
+        // side they requested (`mode`) and the AI takes the opposite seat. The slot token for the
+        // creator's colour is handed back; the AI seat has no token (its moves are server-side).
+        // The service guarantees a token exists for the creator's colour, so the null-forgiving
+        // operator here is safe.
+        var creatorColor = opponent == GameOpponentType.Ai ? mode : PlayerColor.White;
+        var playerToken = creatorColor == PlayerColor.White
+            ? game.WhiteSlotToken!.Value
+            : game.BlackSlotToken!.Value;
 
         // The client owns its own origin, so we hand back a relative path rather than guessing
-        // the client's scheme/host from this API request.
-        var joinUrl = $"/game/{game.Id}";
+        // the client's scheme/host from this API request. AI games have no join URL, but the field
+        // is kept for contract consistency; the client simply won't render a share link for them.
+        var joinUrl = opponent == GameOpponentType.Ai ? null : $"/game/{game.Id}";
 
         var response = new CreateGameResponse(
             GameId: game.Id,
-            PlayerToken: game.WhiteSlotToken!.Value,
-            Color: PlayerColor.White,
+            PlayerToken: playerToken,
+            Color: creatorColor,
             JoinUrl: joinUrl,
-            GameState: GameStateResponse.FromGame(game, PlayerColor.White));
+            GameState: GameStateResponse.FromGame(game, creatorColor));
 
         return CreatedAtAction(nameof(GetGame), new { gameId = game.Id }, response);
     }

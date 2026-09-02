@@ -29,7 +29,7 @@ public class GamesControllerTests
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
         Assert.NotNull(body);
-        return (body!.GameId, body.PlayerToken);
+        return (body!.GameId, body!.PlayerToken);
     }
 
     private async Task<Guid> JoinGameAsync(Guid gameId)
@@ -61,6 +61,78 @@ public class GamesControllerTests
         Assert.NotNull(body);
         Assert.Equal(GameStatus.WaitingForPlayer2, body!.GameState.Status);
         Assert.NotEqual(Guid.Empty, body.PlayerToken);
+        Assert.Equal(PlayerColor.White, body.Color);
+        Assert.Equal(GameOpponentType.Human, body.GameState.OpponentType);
+        Assert.Null(body.GameState.AiColor);
+    }
+
+    [Fact]
+    public async Task CreateGame_WithBody_CreatesHumanGameByDefault()
+    {
+        // An explicit human body should behave exactly like the original no-body request.
+        var response = await _client.PostAsync(
+            "/api/games",
+            JsonContent.Create(new CreateGameRequest(GameOpponentType.Human, PlayerColor.White), options: JsonOptions));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameStatus.WaitingForPlayer2, body!.GameState.Status);
+        Assert.Equal(GameOpponentType.Human, body.GameState.OpponentType);
+        Assert.Equal(PlayerColor.White, body.Color);
+    }
+
+    [Fact]
+    public async Task CreateGame_AiOpponent_WhiteMode_CreatesActiveGameWithAiOnBlack()
+    {
+        var response = await _client.PostAsync(
+            "/api/games",
+            JsonContent.Create(new CreateGameRequest(GameOpponentType.Ai, PlayerColor.White), options: JsonOptions));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameStatus.Active, body!.GameState.Status);
+        Assert.Equal(GameOpponentType.Ai, body.GameState.OpponentType);
+        Assert.Equal(PlayerColor.Black, body.GameState.AiColor);
+        Assert.Equal(PlayerColor.White, body.Color);
+        Assert.NotEqual(Guid.Empty, body.PlayerToken);
+        Assert.Null(body.JoinUrl);
+        // No opening move should have been applied yet.
+        Assert.Equal(0, body.GameState.MoveCount);
+    }
+
+    [Fact]
+    public async Task CreateGame_AiOpponent_BlackMode_CreatesActiveGameWithAiOnWhite()
+    {
+        var response = await _client.PostAsync(
+            "/api/games",
+            JsonContent.Create(new CreateGameRequest(GameOpponentType.Ai, PlayerColor.Black), options: JsonOptions));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameStatus.Active, body!.GameState.Status);
+        Assert.Equal(GameOpponentType.Ai, body.GameState.OpponentType);
+        Assert.Equal(PlayerColor.White, body.GameState.AiColor);
+        Assert.Equal(PlayerColor.Black, body.Color);
+        Assert.NotEqual(Guid.Empty, body.PlayerToken);
+        Assert.Null(body.JoinUrl);
+        Assert.Equal(0, body.GameState.MoveCount);
+    }
+
+    [Fact]
+    public async Task CreateGame_AiOpponent_CannotBeJoinedBySecondPlayer()
+    {
+        var createResponse = await _client.PostAsync(
+            "/api/games",
+            JsonContent.Create(new CreateGameRequest(GameOpponentType.Ai, PlayerColor.White), options: JsonOptions));
+        var created = await createResponse.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(created);
+
+        var joinResponse = await _client.PostAsync($"/api/games/{created!.GameId}/join", content: null);
+
+        Assert.Equal(HttpStatusCode.Conflict, joinResponse.StatusCode);
     }
 
     [Fact]

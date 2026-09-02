@@ -4,6 +4,7 @@
 
 import { apiRequest } from "./httpClient";
 import type {
+  CreateGameRequest,
   CreateGameResponse,
   GameStateResponse,
   JoinGameResponse,
@@ -11,8 +12,15 @@ import type {
   PromotionPieceType,
 } from "../types/gameTypes";
 
-export function createGame(): Promise<CreateGameResponse> {
-  return apiRequest<CreateGameResponse>("/api/games", { method: "POST" });
+// Creates a new game. With no arguments this creates the original
+// human-vs-human game that waits for a second player to join. Pass an
+// `opponent` of "Ai" (and a `mode` for the creator's side) to start an AI
+// game, which the server creates as Active with the AI on the opposite seat.
+export function createGame(request?: CreateGameRequest): Promise<CreateGameResponse> {
+  return apiRequest<CreateGameResponse>("/api/games", {
+    method: "POST",
+    body: request,
+  });
 }
 
 export function joinGame(gameId: string): Promise<JoinGameResponse> {

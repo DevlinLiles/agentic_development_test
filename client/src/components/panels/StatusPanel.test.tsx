@@ -17,6 +17,8 @@ function makeGameState(overrides: Partial<GameStateResponse>): GameStateResponse
     moveCount: 0,
     isCheck: false,
     lastMove: null,
+    opponentType: "Human",
+    aiColor: null,
     ...overrides,
   };
 }

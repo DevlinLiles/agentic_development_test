@@ -19,6 +19,10 @@ export type GameResultReason =
 
 export type PromotionPieceType = "Queen" | "Rook" | "Bishop" | "Knight";
 
+// Whether the second seat is a human (waits for a join) or the computer (the
+// game starts immediately as Active with the AI taking the requested seat).
+export type GameOpponentType = "Human" | "Ai";
+
 export interface LastMove {
   from: string;
   to: string;
@@ -36,6 +40,11 @@ export interface GameStateResponse {
   moveCount: number;
   isCheck: boolean;
   lastMove: LastMove | null;
+  // The kind of opponent for the second seat. Human games wait for a join; Ai
+  // games start Active with the computer on the seat named by `aiColor`.
+  opponentType: GameOpponentType;
+  // The seat the AI occupies, or null for human-vs-human games.
+  aiColor: PlayerColor | null;
 }
 
 export interface MoveHistoryEntry {
@@ -53,11 +62,22 @@ export interface MoveHistoryResponse {
   moves: MoveHistoryEntry[];
 }
 
+// Request body for POST /api/games. Both fields are optional server-side
+// (defaulting to a human game where the creator plays White); pass `Ai` to
+// start an AI game, and `mode` to pick the side the creator plays (the AI
+// takes the opposite seat).
+export interface CreateGameRequest {
+  opponent?: GameOpponentType;
+  mode?: PlayerColor;
+}
+
 export interface CreateGameResponse {
   gameId: string;
   playerToken: string;
   color: PlayerColor;
-  joinUrl: string;
+  // Only present for human-vs-human games; AI games have no second player to
+  // share a join link with.
+  joinUrl: string | null;
   gameState: GameStateResponse;
 }
 

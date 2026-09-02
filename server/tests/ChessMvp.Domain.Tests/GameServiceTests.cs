@@ -35,14 +35,52 @@ public class GameServiceTests
     };
 
     [Fact]
-    public async Task CreateGameAsync_ReturnsWaitingGameWithWhiteToken()
+    public async Task CreateGameAsync_HumanOpponent_ReturnsWaitingGameWithWhiteToken()
     {
-        var game = await _sut.CreateGameAsync();
+        var game = await _sut.CreateGameAsync(GameOpponentType.Human, PlayerColor.White);
 
         Assert.Equal(GameStatus.WaitingForPlayer2, game.Status);
+        Assert.Equal(GameOpponentType.Human, game.OpponentType);
+        Assert.Null(game.AiColor);
         Assert.NotNull(game.WhiteSlotToken);
         Assert.Null(game.BlackSlotToken);
         Assert.Equal(ChessConstants.StartingFen, game.CurrentFen);
+        Assert.Equal(PlayerColor.White, game.Turn);
+        await _repository.Received(1).AddAsync(game);
+        await _repository.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task CreateGameAsync_AiOpponent_WhiteMode_AssignsAiToBlackAndActivates()
+    {
+        var game = await _sut.CreateGameAsync(GameOpponentType.Ai, PlayerColor.White);
+
+        Assert.Equal(GameStatus.Active, game.Status);
+        Assert.Equal(GameOpponentType.Ai, game.OpponentType);
+        Assert.Equal(PlayerColor.Black, game.AiColor);
+        // The human (White) keeps a slot token; the AI seat (Black) has none.
+        Assert.NotNull(game.WhiteSlotToken);
+        Assert.Null(game.BlackSlotToken);
+        Assert.Equal(ChessConstants.StartingFen, game.CurrentFen);
+        Assert.Equal(PlayerColor.White, game.Turn);
+        await _repository.Received(1).AddAsync(game);
+        await _repository.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task CreateGameAsync_AiOpponent_BlackMode_AssignsAiToWhiteAndActivates()
+    {
+        var game = await _sut.CreateGameAsync(GameOpponentType.Ai, PlayerColor.Black);
+
+        Assert.Equal(GameStatus.Active, game.Status);
+        Assert.Equal(GameOpponentType.Ai, game.OpponentType);
+        Assert.Equal(PlayerColor.White, game.AiColor);
+        // The human (Black) keeps a slot token; the AI seat (White) has none.
+        Assert.Null(game.WhiteSlotToken);
+        Assert.NotNull(game.BlackSlotToken);
+        Assert.Equal(ChessConstants.StartingFen, game.CurrentFen);
+        // The AI is White and would move first, but the opening move is NOT computed here — the
+        // initialised state still has Turn = White until a later step generates the AI move.
         Assert.Equal(PlayerColor.White, game.Turn);
         await _repository.Received(1).AddAsync(game);
         await _repository.Received(1).SaveChangesAsync();

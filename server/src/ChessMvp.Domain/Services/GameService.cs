@@ -17,21 +17,57 @@ public sealed class GameService : IGameService
         _notifier = notifier;
     }
 
-    public async Task<Game> CreateGameAsync()
+    public async Task<Game> CreateGameAsync(GameOpponentType opponent, PlayerColor mode)
     {
         var now = DateTime.UtcNow;
         var game = new Game
         {
             Id = Guid.NewGuid(),
-            WhiteSlotToken = Guid.NewGuid(),
-            BlackSlotToken = null,
             CurrentFen = ChessConstants.StartingFen,
             Turn = PlayerColor.White,
-            Status = GameStatus.WaitingForPlayer2,
             HalfmoveClock = 0,
             CreatedUtc = now,
             UpdatedUtc = now,
         };
+
+        if (opponent == GameOpponentType.Ai)
+        {
+            // The human requested `mode` as their side, so the AI takes the opposite seat. The game
+            // is immediately Active — there is no second human player to wait for. The AI's opening
+            // move is intentionally NOT computed or applied here; a later step does that. For the
+            // human-plays-Black case that leaves the game Active with Turn = White (the AI), which
+            // is the correct initialised state until the AI move is generated.
+            var aiColor = mode == PlayerColor.White ? PlayerColor.Black : PlayerColor.White;
+
+            game.OpponentType = GameOpponentType.Ai;
+            game.AiColor = aiColor;
+            game.Status = GameStatus.Active;
+
+            // The human keeps the slot token for their colour so they can submit moves; the AI seat
+            // gets no token because AI moves are applied server-side, not through the join/move
+            // token path (and joining an AI game is rejected outright — see JoinGameAsync).
+            if (mode == PlayerColor.White)
+            {
+                game.WhiteSlotToken = Guid.NewGuid();
+                game.BlackSlotToken = null;
+            }
+            else
+            {
+                game.WhiteSlotToken = null;
+                game.BlackSlotToken = Guid.NewGuid();
+            }
+        }
+        else
+        {
+            // Human-vs-human: unchanged from the original behaviour — the creator plays White and
+            // the game waits for a second player to join. `mode` is intentionally ignored here so
+            // human games behave exactly as before.
+            game.OpponentType = GameOpponentType.Human;
+            game.AiColor = null;
+            game.WhiteSlotToken = Guid.NewGuid();
+            game.BlackSlotToken = null;
+            game.Status = GameStatus.WaitingForPlayer2;
+        }
 
         await _repository.AddAsync(game);
         await _repository.SaveChangesAsync();

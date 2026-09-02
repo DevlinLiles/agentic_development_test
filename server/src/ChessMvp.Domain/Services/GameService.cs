@@ -43,6 +43,13 @@ public sealed class GameService : IGameService
     {
         var game = await _repository.GetByIdAsync(gameId) ?? throw new GameNotFoundException(gameId);
 
+        // AI games have no open human seat — the computer plays the second color, so joining one
+        // as player 2 would either deadlock the board or overwrite the AI's slot. Reject early.
+        if (game.OpponentType == GameOpponentType.Ai)
+        {
+            throw new GameIsAiOpponentException(gameId);
+        }
+
         if (game.BlackSlotToken is not null || game.Status != GameStatus.WaitingForPlayer2)
         {
             throw new GameNotActiveException("This game already has two players or is no longer accepting joins.");

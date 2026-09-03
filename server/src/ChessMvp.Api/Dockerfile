@@ -40,6 +40,6 @@ ENV ASPNETCORE_URLS=http://0.0.0.0:5112
 EXPOSE 5112
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=200s --retries=12 \
-  CMD curl --fail http://localhost:5112/openapi/v1.json || exit 1
+  CMD curl --fail http://127.0.0.1:5112/openapi/v1.json || exit 1
 
 ENTRYPOINT ["dotnet", "ChessMvp.Api.dll"]

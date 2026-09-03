@@ -38,6 +38,6 @@ COPY client/nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 5173
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \
-  CMD wget --quiet --tries=1 --spider http://localhost:5173/ || exit 1
+  CMD wget --quiet --tries=1 --spider http://127.0.0.1:5173/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

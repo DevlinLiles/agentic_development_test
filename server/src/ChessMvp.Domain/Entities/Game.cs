@@ -18,6 +18,8 @@ public class Game
 
     public GameResultReason? ResultReason { get; set; }
 
+    public GameMode Mode { get; set; } = GameMode.TwoPlayer;
+
     public int HalfmoveClock { get; set; }
 
     public DateTime CreatedUtc { get; set; }

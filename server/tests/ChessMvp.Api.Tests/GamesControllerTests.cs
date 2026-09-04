@@ -64,6 +64,67 @@ public class GamesControllerTests
     }
 
     [Fact]
+    public async Task CreateGame_WithoutMode_DefaultsToTwoPlayerAndIncludesJoinUrl()
+    {
+        // Backward compatibility: existing clients send no mode parameter and must keep
+        // receiving the original two-player behaviour with a shareable join URL.
+        var response = await _client.PostAsync("/api/games", content: null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameMode.TwoPlayer, body!.Mode);
+        Assert.Equal(GameMode.TwoPlayer, body.GameState.Mode);
+        Assert.NotNull(body.JoinUrl);
+        Assert.Equal(GameStatus.WaitingForPlayer2, body.GameState.Status);
+    }
+
+    [Fact]
+    public async Task CreateGame_WithVsAiMode_ReturnsActiveGameWithNullJoinUrl()
+    {
+        var response = await _client.PostAsync("/api/games?mode=VsAi", content: null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameMode.VsAi, body!.Mode);
+        Assert.Equal(GameMode.VsAi, body.GameState.Mode);
+        // VsAi games have no second human to invite, so the join URL is omitted.
+        Assert.Null(body.JoinUrl);
+        // The AI is seated immediately, so the game starts active rather than waiting.
+        Assert.Equal(GameStatus.Active, body.GameState.Status);
+        Assert.NotEqual(Guid.Empty, body.PlayerToken);
+    }
+
+    [Fact]
+    public async Task CreateGame_WithExplicitTwoPlayerMode_BehavesAsDefault()
+    {
+        var response = await _client.PostAsync("/api/games?mode=TwoPlayer", content: null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameMode.TwoPlayer, body!.Mode);
+        Assert.NotNull(body.JoinUrl);
+        Assert.Equal(GameStatus.WaitingForPlayer2, body.GameState.Status);
+    }
+
+    [Fact]
+    public async Task GetGame_SurfacesModeViaFromGame()
+    {
+        // Create a VsAi game, then fetch it separately and confirm the mode propagates
+        // through GameStateResponse.FromGame on the read path too.
+        var created = await _client.PostAsync("/api/games?mode=VsAi", content: null);
+        var createdBody = await created.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(createdBody);
+
+        var state = await _client.GetFromJsonAsync<GameStateResponse>(
+            $"/api/games/{createdBody!.GameId}", JsonOptions);
+        Assert.NotNull(state);
+        Assert.Equal(GameMode.VsAi, state!.Mode);
+    }
+
+    [Fact]
     public async Task FullGameFlow_FoolsMate_EndsInCheckmateWithCorrectHistory()
     {
         var (gameId, whiteToken) = await CreateGameAsync();

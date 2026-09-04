@@ -9,7 +9,14 @@ export interface JoinLinkPanelProps {
 export function JoinLinkPanel({ gameState }: JoinLinkPanelProps) {
   const [copied, setCopied] = useState(false);
 
-  if (gameState.status !== "WaitingForPlayer2" || gameState.yourColor !== "White") {
+  // Only the White player in a two-player game waiting for a second human has
+  // a link to share. VsAi games start active with the AI already seated, so
+  // there is no one to invite.
+  if (
+    gameState.mode !== "TwoPlayer" ||
+    gameState.status !== "WaitingForPlayer2" ||
+    gameState.yourColor !== "White"
+  ) {
     return null;
   }
 

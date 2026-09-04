@@ -6,7 +6,8 @@ public sealed record CreateGameResponse(
     Guid GameId,
     Guid PlayerToken,
     PlayerColor Color,
-    string JoinUrl,
+    GameMode Mode,
+    string? JoinUrl,
     GameStateResponse GameState);
 
 public sealed record JoinGameResponse(

@@ -100,6 +100,39 @@ public sealed class GerasimleoChessRulesEngineAdapter : IChessRulesEngine
         return destinationRank is '8' or '1';
     }
 
+    public IReadOnlyList<LegalMove> GetAllLegalMoves(string fen)
+    {
+        if (!ChessBoard.TryLoadFromFen(fen, out var board, EnabledDrawRules))
+        {
+            return Array.Empty<LegalMove>();
+        }
+
+        // Inspect the moving piece for each candidate move so promotion can be flagged per-move,
+        // reusing the same pawn-to-back-rank heuristic as IsPromotionMove rather than relying on
+        // library-specific promotion plumbing (which fires through an event during application).
+        return board.Moves()
+            .Select(m => ToLegalMove(board, m))
+            .ToList();
+    }
+
+    private static LegalMove ToLegalMove(ChessBoard board, EngineMove move)
+    {
+        var fromSquare = move.OriginalPosition.ToString();
+        var toSquare = move.NewPosition.ToString();
+
+        var piece = board[fromSquare];
+        var isPromotion = piece is not null
+            && piece.Type == PieceType.Pawn
+            && toSquare[^1] is '8' or '1';
+
+        return new LegalMove
+        {
+            FromSquare = fromSquare,
+            ToSquare = toSquare,
+            IsPromotion = isPromotion,
+        };
+    }
+
     private static PieceColor ToEngineColor(PlayerColor color) =>
         color == PlayerColor.White ? PieceColor.White : PieceColor.Black;
 

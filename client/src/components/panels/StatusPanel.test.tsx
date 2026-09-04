@@ -8,6 +8,7 @@ const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 function makeGameState(overrides: Partial<GameStateResponse>): GameStateResponse {
   return {
     gameId: "game-1",
+    mode: "TwoPlayer",
     status: "Active",
     fen: START_FEN,
     turn: "White",

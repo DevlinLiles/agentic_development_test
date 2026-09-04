@@ -1,4 +1,5 @@
 using ChessMvp.Domain.Abstractions;
+using ChessMvp.Domain.Entities;
 
 namespace ChessMvp.ChessAi;
 
@@ -21,6 +22,12 @@ namespace ChessMvp.ChessAi;
 /// single engine consistently, and is not comparable across different implementations. It may be
 /// <c>0</c> or unused by engines that do not score positions.
 /// </para>
+/// <para>
+/// <see cref="PromotionPiece"/> communicates the promotion piece an engine chose when
+/// <see cref="Move"/> is a promotion move. It is <c>null</c> for non-promotion moves and for
+/// engines that do not select a promotion piece; when present it lets the caller apply the
+/// chosen move without re-deriving the piece.
+/// </para>
 /// </remarks>
 public sealed record AiMoveResult
 {
@@ -42,6 +49,13 @@ public sealed record AiMoveResult
     /// and shallow tests; never relied upon for correctness.
     /// </summary>
     public int ConsideredMoveCount { get; init; }
+
+    /// <summary>
+    /// The promotion piece chosen for <see cref="Move"/> when it is a promotion move, or
+    /// <c>null</c> when <see cref="Move"/> is not a promotion (or the engine does not select a
+    /// promotion piece). When non-null, callers should apply <see cref="Move"/> with this piece.
+    /// </summary>
+    public PromotionPieceType? PromotionPiece { get; init; }
 
     /// <summary>
     /// Optional human-readable explanation of the choice (e.g. principal-variation summary,

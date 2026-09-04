@@ -38,6 +38,10 @@ export function GameScreen() {
       try {
         const existingSession = getSession(currentGameId);
 
+        // The creator always has a session persisted at create time (both
+        // TwoPlayer and VsAi), so this branch is the normal entry point for
+        // the player who started the game — including VsAi, where the game is
+        // already Active and there is nothing to join.
         if (existingSession) {
           const state = await gamesApi.getGameState(currentGameId, existingSession.playerToken);
           if (cancelled) return;
@@ -48,6 +52,16 @@ export function GameScreen() {
 
         const state = await gamesApi.getGameState(currentGameId);
         if (cancelled) return;
+
+        // VsAi games seat the AI at creation and start Active — there is no
+        // second human seat to claim, so the join path does not apply. A
+        // browser without a saved session for one can only be a
+        // non-participant (no spectator mode), regardless of status.
+        if (state.mode === "VsAi") {
+          setNotParticipant(true);
+          setGameState(state);
+          return;
+        }
 
         if (state.status !== "WaitingForPlayer2") {
           setNotParticipant(true);

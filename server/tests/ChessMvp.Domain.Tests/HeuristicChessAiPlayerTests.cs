@@ -46,12 +46,20 @@ public class HeuristicChessAiPlayerTests
         // tie-break must be stable regardless of how many times it runs.
         var first = await _sut.ChooseMoveAsync(ChessConstants.StartingFen, PlayerColor.White);
         var second = await _sut.ChooseMoveAsync(ChessConstants.StartingFen, PlayerColor.White);
+        var third = await _sut.ChooseMoveAsync(ChessConstants.StartingFen, PlayerColor.White);
 
         Assert.True(first.Success);
         Assert.True(second.Success);
+        Assert.True(third.Success);
         Assert.Equal(first.Move!.FromSquare, second.Move!.FromSquare);
         Assert.Equal(first.Move!.ToSquare, second.Move!.ToSquare);
         Assert.Equal(first.Move!.Promotion, second.Move!.Promotion);
+        Assert.Equal(first.Move!.FromSquare, third.Move!.FromSquare);
+        Assert.Equal(first.Move!.ToSquare, third.Move!.ToSquare);
+        Assert.Equal(first.Move!.Promotion, third.Move!.Promotion);
+        // The whole move record must be equal in shape across invocations.
+        Assert.Equal(first.Move, second.Move);
+        Assert.Equal(first.Move, third.Move);
     }
 
     [Fact]
@@ -102,15 +110,47 @@ public class HeuristicChessAiPlayerTests
     [Fact]
     public async Task ChooseMoveAsync_Promotion_AlwaysResolvesAPromotionPiece()
     {
-        // A promotion move in a more cluttered position must still arrive with a resolved
-        // promotion piece (queen/rook/bishop/knight) — never null — regardless of which piece wins.
-        const string fen = "3rk3/4P3/8/8/8/8/8/4K3 w - - 0 1";
+        // A promotion move in a position with extra material (a white rook on a1) must still arrive
+        // with a resolved promotion piece (queen/rook/bishop/knight) — never null — regardless of
+        // which piece wins. e8 is empty and nothing sits on d8/f8, so the e7-e8 push is the unique
+        // promotion and, with its ~+800cp material swing, the highest-scoring move; the chosen
+        // promotion piece (queen) is therefore committed on the move.
+        const string fen = "7k/4P3/8/8/8/8/8/R3K3 w - - 0 1";
 
         var result = await _sut.ChooseMoveAsync(fen, PlayerColor.White);
 
         Assert.True(result.Success, result.Reason);
+        Assert.Equal("e7", result.Move!.FromSquare, StringComparer.OrdinalIgnoreCase);
         Assert.Equal("e8", result.Move!.ToSquare, StringComparer.OrdinalIgnoreCase);
         Assert.NotNull(result.Move!.Promotion);
+    }
+
+    [Fact]
+    public async Task ChooseMoveAsync_Promotion_DeterministicAcrossInvocations()
+    {
+        // Repeated calls on the same promotion position must resolve to the exact same move — same
+        // from/to AND the same committed promotion piece — every time. This guards against any
+        // non-determinism in promotion expansion or selection.
+        const string fen = "7k/4P3/8/8/8/8/8/4K3 w - - 0 1";
+
+        var first = await _sut.ChooseMoveAsync(fen, PlayerColor.White);
+        var second = await _sut.ChooseMoveAsync(fen, PlayerColor.White);
+        var third = await _sut.ChooseMoveAsync(fen, PlayerColor.White);
+
+        Assert.True(first.Success, first.Reason);
+        Assert.True(second.Success, second.Reason);
+        Assert.True(third.Success, third.Reason);
+
+        // The chosen promotion piece is deterministic and is the material-maximizing queen.
+        Assert.Equal(PromotionPieceType.Queen, first.Move!.Promotion);
+        Assert.Equal(PromotionPieceType.Queen, second.Move!.Promotion);
+        Assert.Equal(PromotionPieceType.Queen, third.Move!.Promotion);
+
+        // Identical move across every invocation, including promotion.
+        Assert.Equal(first.Move, second.Move);
+        Assert.Equal(first.Move, third.Move);
+        Assert.Equal(first.ResultingFen, second.ResultingFen);
+        Assert.Equal(first.ResultingFen, third.ResultingFen);
     }
 
     [Fact]

@@ -14,6 +14,8 @@ public class Game
 
     public GameStatus Status { get; set; } = GameStatus.WaitingForPlayer2;
 
+    public GameMode Mode { get; set; } = GameMode.TwoPlayer;
+
     public GameResult? Result { get; set; }
 
     public GameResultReason? ResultReason { get; set; }

@@ -9,6 +9,8 @@ export type PlayerColor = "White" | "Black";
 
 export type GameStatus = "WaitingForPlayer2" | "Active" | "Ended";
 
+export type GameMode = "TwoPlayer" | "VsAi";
+
 export type GameResult = "WhiteWins" | "BlackWins" | "Draw";
 
 export type GameResultReason =
@@ -27,6 +29,7 @@ export interface LastMove {
 
 export interface GameStateResponse {
   gameId: string;
+  mode: GameMode;
   status: GameStatus;
   fen: string;
   turn: PlayerColor;
@@ -57,7 +60,8 @@ export interface CreateGameResponse {
   gameId: string;
   playerToken: string;
   color: PlayerColor;
-  joinUrl: string;
+  mode: GameMode;
+  joinUrl: string | null;
   gameState: GameStateResponse;
 }
 

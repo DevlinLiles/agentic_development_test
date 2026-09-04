@@ -5,14 +5,19 @@
 import { apiRequest } from "./httpClient";
 import type {
   CreateGameResponse,
+  GameMode,
   GameStateResponse,
   JoinGameResponse,
   MoveHistoryResponse,
   PromotionPieceType,
 } from "../types/gameTypes";
 
-export function createGame(): Promise<CreateGameResponse> {
-  return apiRequest<CreateGameResponse>("/api/games", { method: "POST" });
+// `mode` is optional so existing callers that omit it receive the original
+// TwoPlayer behaviour from the server. Pass "VsAi" to start a single-player
+// game against the AI engine.
+export function createGame(mode?: GameMode): Promise<CreateGameResponse> {
+  const search = mode ? `?mode=${encodeURIComponent(mode)}` : "";
+  return apiRequest<CreateGameResponse>(`/api/games${search}`, { method: "POST" });
 }
 
 export function joinGame(gameId: string): Promise<JoinGameResponse> {

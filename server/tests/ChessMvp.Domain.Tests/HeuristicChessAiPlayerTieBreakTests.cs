@@ -15,14 +15,15 @@ namespace ChessMvp.Domain.Tests;
 /// </summary>
 public class HeuristicChessAiPlayerTieBreakTests
 {
-    // Bare kings far apart with White to move. The White king on e1 can step to d1, d2, e2, f1, or
-    // f2. In the evaluator's piece-square table the d1 and f1 squares are mirror images across the
-    // e-file and both carry the maximum king-table bonus (30) among the available destinations;
-    // the black king sits on the mirror axis (e8) so its contribution is identical for the two
-    // candidates, and their resulting boards are mirror images with equal mobility. Kd1 and Kf1
-    // therefore score *exactly* the same and are the highest-scoring moves — a genuine top-of-list
-    // tie that the player must break deterministically.
-    private const string TieFen = "4k3/8/8/8/8/8/8/4K3 w - - 0 1";
+    // Bare kings with White to move. The White king on e3 can step to d2, e2, f2, d3, f3, d4, e4,
+    // or f4. In the evaluator's king piece-square table the d2, e2, and f2 squares all carry a
+    // value of 0 — the maximum among the king's available destinations (d3/f3 score -20 and the
+    // rank-4 destinations score -40) — and each resulting position leaves the lone White king on
+    // an interior second-rank square with exactly eight legal moves while the Black king on h8 is
+    // untouched, so material, piece-square, and mobility are identical across the three
+    // candidates. Ke3-d2, Ke3-e2, and Ke3-f2 therefore score *exactly* the same and are the
+    // highest-scoring moves — a genuine top-of-list tie that the player must break deterministically.
+    private const string TieFen = "7k/8/8/8/8/4K3/8/8 w - - 0 1";
 
     private static HeuristicChessAiPlayer CreateSut() =>
         new(new GerasimleoChessRulesEngineAdapter(), new HeuristicBoardEvaluator());
@@ -61,11 +62,11 @@ public class HeuristicChessAiPlayerTieBreakTests
             topGroup.Count >= 2,
             $"Expected a tie (>= 2 equally-best moves) in {TieFen}, but only one move scored {topScore}.");
 
-        // The documented tie-break is lexicographically smallest move key (ordinal). e1d1 < e1f1,
-        // so the deterministic choice must be Kd1.
+        // The documented tie-break is lexicographically smallest move key (ordinal). e3d2 < e3e2 <
+        // e3f2, so the deterministic choice must be Ke3-d2.
         var expected = topGroup.OrderBy(s => s.Key, StringComparer.Ordinal).First();
-        Assert.Equal("e1", expected.From, StringComparer.OrdinalIgnoreCase);
-        Assert.Equal("d1", expected.To, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("e3", expected.From, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("d2", expected.To, StringComparer.OrdinalIgnoreCase);
 
         // The player must agree with the independently-computed deterministic winner...
         var first = await sut.ChooseMoveAsync(TieFen, PlayerColor.White);
@@ -89,17 +90,19 @@ public class HeuristicChessAiPlayerTieBreakTests
     [Fact]
     public async Task ChooseMoveAsync_TiePosition_PicksLexicographicallySmallestKey()
     {
-        // A focused assertion on the tie-break rule itself: among the tied top moves Kd1 (e1d1) and
-        // Kf1 (e1f1), the ordinal-smallest key "e1d1" must win. This decouples the tie-break claim
-        // from the broader self-verifying test above.
+        // A focused assertion on the tie-break rule itself: among the tied top moves Ke3-d2 (e3d2),
+        // Ke3-e2 (e3e2), and Ke3-f2 (e3f2), the ordinal-smallest key "e3d2" must win. This decouples
+        // the tie-break claim from the broader self-verifying test above.
         var sut = CreateSut();
 
         var result = await sut.ChooseMoveAsync(TieFen, PlayerColor.White);
 
         Assert.True(result.Success, result.Reason);
-        Assert.Equal("e1", result.Move!.FromSquare, StringComparer.OrdinalIgnoreCase);
-        Assert.Equal("d1", result.Move!.ToSquare, StringComparer.OrdinalIgnoreCase);
-        // Ordinal comparison: "e1d1" < "e1f1", so the tie-break must never select e1f1.
-        Assert.NotEqual("f1", result.Move!.ToSquare);
+        Assert.Equal("e3", result.Move!.FromSquare, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("d2", result.Move!.ToSquare, StringComparer.OrdinalIgnoreCase);
+        // Ordinal comparison: "e3d2" is the smallest of the tied keys, so the tie-break must never
+        // select e2 or f2 here.
+        Assert.NotEqual("e2", result.Move!.ToSquare);
+        Assert.NotEqual("f2", result.Move!.ToSquare);
     }
 }

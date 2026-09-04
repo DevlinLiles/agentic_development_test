@@ -100,6 +100,52 @@ public sealed class GerasimleoChessRulesEngineAdapter : IChessRulesEngine
         return destinationRank is '8' or '1';
     }
 
+    /// <summary>
+    /// Enumerates every legal move for the side to move, mapping the underlying library's
+    /// <see cref="EngineMove"/> onto <see cref="LegalMove"/> values. Promotion is detected by
+    /// the same heuristic used in <see cref="IsPromotionMove"/>: the moving piece is a pawn and
+    /// the destination square sits on the back rank (file '8' for white, '1' for black).
+    /// </summary>
+    public IReadOnlyList<LegalMove> GetAllLegalMoves(string fen)
+    {
+        if (!ChessBoard.TryLoadFromFen(fen, out var board, EnabledDrawRules))
+        {
+            return Array.Empty<LegalMove>();
+        }
+
+        return board.Moves()
+            .Select(m => ToLegalMove(board, m))
+            .ToList();
+    }
+
+    private static LegalMove ToLegalMove(ChessBoard board, EngineMove move)
+    {
+        var from = move.OriginalPosition.ToString();
+        var to = move.NewPosition.ToString();
+
+        return new LegalMove(
+            FromSquare: from,
+            ToSquare: to,
+            San: move.San,
+            IsPromotion: IsPawnPromotion(board, from, to));
+    }
+
+    /// <summary>
+    /// Reuses the <see cref="IsPromotionMove"/> heuristic but without re-loading the board: the
+    /// caller already has a populated <paramref name="board"/>, so the piece lookup is cheap.
+    /// </summary>
+    private static bool IsPawnPromotion(ChessBoard board, string fromSquare, string toSquare)
+    {
+        var piece = board[fromSquare];
+        if (piece is null || piece.Type != PieceType.Pawn)
+        {
+            return false;
+        }
+
+        var destinationRank = toSquare[^1];
+        return destinationRank is '8' or '1';
+    }
+
     private static PieceColor ToEngineColor(PlayerColor color) =>
         color == PlayerColor.White ? PieceColor.White : PieceColor.Black;
 

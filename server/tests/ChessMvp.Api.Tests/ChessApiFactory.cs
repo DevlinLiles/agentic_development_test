@@ -14,9 +14,12 @@ namespace ChessMvp.Api.Tests;
 public sealed class ChessApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     // The parameterless MsSqlBuilder() constructor is obsolete in Testcontainers.MsSql 4.13; pin
-    // the same default image explicitly instead.
+    // the image explicitly instead. We use the rolling "2022-latest" tag (the same one used by the
+    // repo's docker-compose.yml) rather than a specific Cumulative Update tag such as 2022-CU14,
+    // because Microsoft retires old CU tags from MCR over time — a retired tag makes the image
+    // unpullable, which fails every integration test that depends on this container.
     private readonly MsSqlContainer _msSqlContainer =
-        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04").Build();
+        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
 
     public string ConnectionString => _msSqlContainer.GetConnectionString();
 

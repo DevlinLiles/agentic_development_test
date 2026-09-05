@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using ChessMvp.Api.Hubs;
+using ChessMvp.ChessAi;
 using ChessMvp.Domain.Abstractions;
 using ChessMvp.Domain.Services;
 using ChessMvp.Infrastructure;
@@ -20,6 +21,10 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi();
 
 builder.Services.AddChessInfrastructure(builder.Configuration);
+// Wires the heuristic chess AI player in as the singleton IChessAiPlayer implementation so the
+// rest of the application can resolve the AI player transparently. Depends on IChessRulesEngine,
+// which is registered above by AddChessInfrastructure.
+builder.Services.AddChessAi();
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddSingleton<IGameNotifier, SignalRGameNotifier>();
 

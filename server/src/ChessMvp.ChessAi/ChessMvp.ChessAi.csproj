@@ -18,4 +18,17 @@
     <ProjectReference Include="..\ChessMvp.Domain\ChessMvp.Domain.csproj" />
   </ItemGroup>
 
+  <!--
+    DI abstractions are referenced so this layer can expose its own AddChessAi
+    service-registration extension (mirroring AddChessInfrastructure in the
+    Infrastructure layer) and wire HeuristicChessAiPlayer / IHeuristicEvaluator into
+    the container without forcing every consumer project to perform the registration by
+    hand. Only the abstractions are needed; the concrete
+    Microsoft.Extensions.DependencyInjection container stays in the composition root
+    (ChessMvp.Api) and the test projects.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+  </ItemGroup>
+
 </Project>

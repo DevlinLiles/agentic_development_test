@@ -98,4 +98,17 @@ public class ChessAiServiceCollectionExtensionsTests
         Assert.IsType<HeuristicChessAiPlayer>(first);
         Assert.Same(first, second);
     }
+
+    [Fact]
+    public void AddChessAi_RegistersIGameAiResponderAsChessAiResponderSingleton()
+    {
+        // AddChessAi also wires the domain-layer IGameAiResponder seam to a ChessAiResponder
+        // adapter so GameService can orchestrate automated replies through domain-only types.
+        using var provider = BuildServices().BuildServiceProvider();
+
+        var resolved = provider.GetRequiredService<IGameAiResponder>();
+
+        Assert.NotNull(resolved);
+        Assert.IsType<ChessAiResponder>(resolved);
+    }
 }

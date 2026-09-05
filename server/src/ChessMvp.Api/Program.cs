@@ -63,7 +63,7 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 
-    using var scope = app.ServiceProvider.CreateScope();
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ChessDbContext>();
     db.Database.Migrate();
 }

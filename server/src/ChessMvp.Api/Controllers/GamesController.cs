@@ -20,18 +20,22 @@ public class GamesController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<CreateGameResponse>> CreateGame()
+    public async Task<ActionResult<CreateGameResponse>> CreateGame(GameMode? mode = null)
     {
-        var game = await _gameService.CreateGameAsync();
+        // Existing clients that do not send the mode parameter receive TwoPlayer behavior, so
+        // the default is preserved when the query parameter is omitted.
+        var game = await _gameService.CreateGameAsync(mode ?? GameMode.TwoPlayer);
 
         // The client owns its own origin, so we hand back a relative path rather than guessing
-        // the client's scheme/host from this API request.
-        var joinUrl = $"/game/{game.Id}";
+        // the client's scheme/host from this API request. VsAi games have no second human seat
+        // to join, so no join URL is meaningful and it is omitted (null) for those games.
+        string? joinUrl = game.Mode == GameMode.VsAi ? null : $"/game/{game.Id}";
 
         var response = new CreateGameResponse(
             GameId: game.Id,
             PlayerToken: game.WhiteSlotToken!.Value,
             Color: PlayerColor.White,
+            Mode: game.Mode,
             JoinUrl: joinUrl,
             GameState: GameStateResponse.FromGame(game, PlayerColor.White));
 

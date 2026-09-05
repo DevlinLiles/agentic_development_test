@@ -16,7 +16,9 @@ public static class ServiceCollectionExtensions
     /// Registers the default heuristic chess AI player as a singleton for
     /// <see cref="IChessAiPlayer"/>, together with its <see cref="IHeuristicEvaluator"/>
     /// dependency, so the container can construct and resolve the AI player without any
-    /// additional per-consumer wiring.
+    /// additional per-consumer wiring. Also registers a <see cref="ChessAiResponder"/> adapter
+    /// for the domain-layer <see cref="IGameAiResponder"/> seam so <c>GameService</c> can
+    /// orchestrate automated replies without depending on this project.
     /// </summary>
     /// <param name="services">The service collection to register into.</param>
     /// <returns>The supplied <paramref name="services"/>, for chaining.</returns>
@@ -37,6 +39,10 @@ public static class ServiceCollectionExtensions
     /// construction time, so as long as <see cref="IChessRulesEngine"/> is registered before the
     /// provider is built, <see cref="IChessAiPlayer"/> resolves cleanly.
     /// </para>
+    /// <para>
+    /// <see cref="ChessAiResponder"/> is also a singleton: it only forwards to the singleton
+    /// AI player and rules engine and holds no mutable state of its own.
+    /// </para>
     /// </remarks>
     public static IServiceCollection AddChessAi(this IServiceCollection services)
     {
@@ -47,6 +53,10 @@ public static class ServiceCollectionExtensions
         // The AI player is deterministic and shares only an analysis-only candidate cache, so a
         // singleton is appropriate and guarantees identical instances across resolutions.
         services.AddSingleton<IChessAiPlayer, HeuristicChessAiPlayer>();
+
+        // The domain-layer orchestration seam. Adapts the singleton AI player to domain-only
+        // types so GameService can request automated replies without a project reference here.
+        services.AddSingleton<IGameAiResponder, ChessAiResponder>();
 
         return services;
     }

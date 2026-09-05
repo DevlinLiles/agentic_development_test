@@ -6,6 +6,8 @@ public interface IGameService
 {
     Task<Game> CreateGameAsync();
 
+    Task<Game> CreateGameAsync(GameMode mode);
+
     Task<Game> JoinGameAsync(Guid gameId);
 
     Task<Game> GetGameAsync(Guid gameId);

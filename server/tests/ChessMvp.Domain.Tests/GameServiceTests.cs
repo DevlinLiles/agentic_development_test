@@ -15,11 +15,15 @@ public class GameServiceTests
     private readonly IGameRepository _repository = Substitute.For<IGameRepository>();
     private readonly IChessRulesEngine _rulesEngine = Substitute.For<IChessRulesEngine>();
     private readonly IGameNotifier _notifier = Substitute.For<IGameNotifier>();
+    private readonly IGameAiResponder _aiResponder = Substitute.For<IGameAiResponder>();
     private readonly GameService _sut;
 
     public GameServiceTests()
     {
-        _sut = new GameService(_repository, _rulesEngine, _notifier);
+        // The 4-arg constructor threads the optional AI responder through; for TwoPlayer games
+        // (the default entity Mode) the responder is never consulted, so existing two-player
+        // tests remain unaffected by its presence.
+        _sut = new GameService(_repository, _rulesEngine, _notifier, _aiResponder);
     }
 
     private static Game NewActiveGame(Guid? id = null) => new()
@@ -34,6 +38,19 @@ public class GameServiceTests
         UpdatedUtc = DateTime.UtcNow,
     };
 
+    private static Game NewActiveVsAiGame() => new()
+    {
+        Id = Guid.NewGuid(),
+        WhiteSlotToken = WhiteToken,
+        BlackSlotToken = BlackToken,
+        CurrentFen = ChessConstants.StartingFen,
+        Turn = PlayerColor.White,
+        Status = GameStatus.Active,
+        Mode = GameMode.VsAi,
+        CreatedUtc = DateTime.UtcNow,
+        UpdatedUtc = DateTime.UtcNow,
+    };
+
     [Fact]
     public async Task CreateGameAsync_ReturnsWaitingGameWithWhiteToken()
     {
@@ -42,6 +59,38 @@ public class GameServiceTests
         Assert.Equal(GameStatus.WaitingForPlayer2, game.Status);
         Assert.NotNull(game.WhiteSlotToken);
         Assert.Null(game.BlackSlotToken);
+        Assert.Equal(ChessConstants.StartingFen, game.CurrentFen);
+        Assert.Equal(PlayerColor.White, game.Turn);
+        Assert.Equal(GameMode.TwoPlayer, game.Mode);
+        await _repository.Received(1).AddAsync(game);
+        await _repository.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task CreateGameAsync_WithTwoPlayer_InitializesWaitingWithNullBlackToken()
+    {
+        var game = await _sut.CreateGameAsync(GameMode.TwoPlayer);
+
+        Assert.Equal(GameMode.TwoPlayer, game.Mode);
+        Assert.Equal(GameStatus.WaitingForPlayer2, game.Status);
+        Assert.NotNull(game.WhiteSlotToken);
+        Assert.Null(game.BlackSlotToken);
+        await _repository.Received(1).AddAsync(game);
+        await _repository.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task CreateGameAsync_WithVsAi_InitializesWithSyntheticBlackTokenAndActiveStatus()
+    {
+        var game = await _sut.CreateGameAsync(GameMode.VsAi);
+
+        Assert.Equal(GameMode.VsAi, game.Mode);
+        // VsAi games skip the waiting-for-player2 step: a synthetic BlackSlotToken stands in for
+        // the absent human opponent and the game starts Active so White can move immediately.
+        Assert.Equal(GameStatus.Active, game.Status);
+        Assert.NotNull(game.WhiteSlotToken);
+        Assert.NotNull(game.BlackSlotToken);
+        Assert.NotEqual(game.WhiteSlotToken, game.BlackSlotToken);
         Assert.Equal(ChessConstants.StartingFen, game.CurrentFen);
         Assert.Equal(PlayerColor.White, game.Turn);
         await _repository.Received(1).AddAsync(game);
@@ -277,6 +326,170 @@ public class GameServiceTests
         Assert.Equal(GameResult.Draw, updated.Result);
         Assert.Equal(GameResultReason.FiftyMoveRule, updated.ResultReason);
         Assert.Equal(100, updated.HalfmoveClock);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_TwoPlayerGame_DoesNotInvokeAiResponder()
+    {
+        // Two-player flow must remain completely unchanged even when an AI responder is wired in:
+        // the responder is never consulted for a TwoPlayer game.
+        var game = NewActiveGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string resultingFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e4",
+                ResultingFen = resultingFen,
+            });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        Assert.Single(updated.Moves);
+        _aiResponder.DidNotReceive().SelectReply(Arg.Any<string>(), Arg.Any<PlayerColor>());
+        await _repository.Received(1).SaveChangesAsync();
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_VsAi_GeneratesAiReplyAfterHumanMove()
+    {
+        var game = NewActiveVsAiGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string afterWhiteFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+        const string afterBlackFen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 3";
+
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e4",
+                ResultingFen = afterWhiteFen,
+            });
+
+        // The AI responder is consulted with the position after the human move (Black to move).
+        _aiResponder.SelectReply(afterWhiteFen, PlayerColor.Black)
+            .Returns(new AiReplyMove("b8", "c6", null));
+
+        _rulesEngine.TryApplyMove(afterWhiteFen, PlayerColor.Black, "b8", "c6", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "Nc6",
+                ResultingFen = afterBlackFen,
+            });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        // Both the human move and the AI reply are recorded, and it is White's turn again.
+        Assert.Equal(2, updated.Moves.Count);
+        Assert.Equal(PlayerColor.White, updated.Moves[0].PlyColor);
+        Assert.Equal("e4", updated.Moves[0].San);
+        Assert.Equal(PlayerColor.Black, updated.Moves[1].PlyColor);
+        Assert.Equal("Nc6", updated.Moves[1].San);
+        Assert.Equal(afterBlackFen, updated.CurrentFen);
+        Assert.Equal(PlayerColor.White, updated.Turn);
+        Assert.Equal(GameStatus.Active, updated.Status);
+
+        // Both moves are persisted in a single save and broadcast once at the end.
+        await _repository.Received(1).SaveChangesAsync();
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_VsAi_WhenHumanMoveEndsGame_DoesNotGenerateAiReply()
+    {
+        var game = NewActiveVsAiGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string matingFen = "rnb1kbnr/pppp1Q1p/5p2/4p3/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 0 4";
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "f1", "f7", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "Qxf7#",
+                ResultingFen = matingFen,
+                IsCheckmate = true,
+            });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "f1", "f7", null);
+
+        // The human's mating move ends the game, so there is nothing for the AI to reply to.
+        Assert.Equal(GameStatus.Ended, updated.Status);
+        Assert.Equal(GameResult.WhiteWins, updated.Result);
+        Assert.Single(updated.Moves);
+        _aiResponder.DidNotReceive().SelectReply(Arg.Any<string>(), Arg.Any<PlayerColor>());
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_VsAi_AiReplyEndingInCheckmate_ReusesEndgameDetection()
+    {
+        var game = NewActiveVsAiGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string afterWhiteFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+        const string matingFen = "rnb1kbnr/pppp1qpp/5p2/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3";
+
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e4",
+                ResultingFen = afterWhiteFen,
+            });
+
+        _aiResponder.SelectReply(afterWhiteFen, PlayerColor.Black)
+            .Returns(new AiReplyMove("d8", "e7", null));
+
+        // The AI's reply is itself a checkmate — the same endgame-detection logic used for the
+        // human move must classify it and end the game with Black winning.
+        _rulesEngine.TryApplyMove(afterWhiteFen, PlayerColor.Black, "d8", "e7", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "Qe7#",
+                ResultingFen = matingFen,
+                IsCheckmate = true,
+            });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        Assert.Equal(GameStatus.Ended, updated.Status);
+        Assert.Equal(GameResult.BlackWins, updated.Result);
+        Assert.Equal(GameResultReason.Checkmate, updated.ResultReason);
+        Assert.Equal(2, updated.Moves.Count);
+        Assert.True(updated.Moves[1].IsCheckmate);
+        Assert.Equal(PlayerColor.Black, updated.Moves[1].PlyColor);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_VsAi_WhenAiResponderReturnsNull_RecordsOnlyHumanMove()
+    {
+        var game = NewActiveVsAiGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string afterWhiteFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e4",
+                ResultingFen = afterWhiteFen,
+            });
+
+        // Responder declines to produce a move (e.g. terminal position / engine failure).
+        _aiResponder.SelectReply(afterWhiteFen, PlayerColor.Black).Returns((AiReplyMove?)null);
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        Assert.Single(updated.Moves);
+        Assert.Equal(PlayerColor.Black, updated.Turn);
+        Assert.Equal(GameStatus.Active, updated.Status);
+        await _repository.Received(1).SaveChangesAsync();
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
     }
 
     [Fact]

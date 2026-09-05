@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using ChessMvp.Api.Hubs;
+using ChessMvp.ChessAi;
 using ChessMvp.Domain.Abstractions;
 using ChessMvp.Domain.Services;
 using ChessMvp.Infrastructure;
@@ -20,6 +21,14 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi();
 
 builder.Services.AddChessInfrastructure(builder.Configuration);
+// Wires the heuristic chess AI player in as the singleton IChessAiPlayer implementation so the
+// rest of the application can resolve the AI player transparently. Depends on IChessRulesEngine,
+// which is registered above by AddChessInfrastructure. Also registers the IGameAiResponder adapter
+// that GameService consumes to orchestrate automated replies in VsAi games.
+builder.Services.AddChessAi();
+// GameService takes IGameAiResponder (optional) so it can generate an inline AI reply after a
+// human move in VsAi games; resolving it from the container here keeps the Domain layer free of a
+// dependency on the ChessMvp.ChessAi project.
 builder.Services.AddScoped<IGameService, GameService>();
 builder.Services.AddSingleton<IGameNotifier, SignalRGameNotifier>();
 
@@ -54,12 +63,12 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 
-    using var scope = app.Services.CreateScope();
+    using var scope = app.ServiceProvider.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ChessDbContext>();
     db.Database.Migrate();
 }
 
-// This is a local-only MVP with no HTTPS/production requirement yet (see product spec):
+// This is a local-only MVP with no https/production requirement yet (see product spec):
 // redirecting to HTTPS in Development just forces every client onto the untrusted local dev
 // cert for no benefit, breaking plain-HTTP usage from both real browsers and test tooling
 // unless `dotnet dev-certs https --trust` has been run. Skip it outside Development.

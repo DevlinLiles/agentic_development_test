@@ -1,11 +1,13 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/ChessMvp.Api/ChessMvp.Api.csproj" />
+    <Project Path="src/ChessMvp.ChessAi/ChessMvp.ChessAi.csproj" />
     <Project Path="src/ChessMvp.Domain/ChessMvp.Domain.csproj" />
     <Project Path="src/ChessMvp.Infrastructure/ChessMvp.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ChessMvp.Api.Tests/ChessMvp.Api.Tests.csproj" />
+    <Project Path="tests/ChessMvp.ChessAi.Tests/ChessMvp.ChessAi.Tests.csproj" />
     <Project Path="tests/ChessMvp.Domain.Tests/ChessMvp.Domain.Tests.csproj" />
   </Folder>
 </Solution>

@@ -5,14 +5,30 @@
 import { apiRequest } from "./httpClient";
 import type {
   CreateGameResponse,
+  GameMode,
   GameStateResponse,
   JoinGameResponse,
   MoveHistoryResponse,
   PromotionPieceType,
 } from "../types/gameTypes";
 
-export function createGame(): Promise<CreateGameResponse> {
-  return apiRequest<CreateGameResponse>("/api/games", { method: "POST" });
+/**
+ * Creates a new game.
+ *
+ * `mode` selects between a two-player shared-seat game ("TwoPlayer") and a
+ * game against the server's AI player ("VsAi"). It is forwarded as the `mode`
+ * query parameter, which the backend binds to its nullable GameMode enum and
+ * defaults to TwoPlayer when omitted — so existing callers that pass nothing
+ * keep the original behavior.
+ */
+export function createGame(mode?: GameMode): Promise<CreateGameResponse> {
+  const searchParams = new URLSearchParams();
+  if (mode) {
+    searchParams.set("mode", mode);
+  }
+  const query = searchParams.toString();
+  const path = query.length > 0 ? `/api/games?${query}` : "/api/games";
+  return apiRequest<CreateGameResponse>(path, { method: "POST" });
 }
 
 export function joinGame(gameId: string): Promise<JoinGameResponse> {

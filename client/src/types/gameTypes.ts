@@ -9,6 +9,12 @@ export type PlayerColor = "White" | "Black";
 
 export type GameStatus = "WaitingForPlayer2" | "Active" | "Ended";
 
+// Mirrors the server-side ChessMvp.Domain.Entities.GameMode enum, which is
+// serialized as a string via JsonStringEnumConverter. "TwoPlayer" is a
+// shared-seat game awaiting a second human; "VsAi" pits the creator against
+// the server's heuristic AI player (the human always plays White).
+export type GameMode = "TwoPlayer" | "VsAi";
+
 export type GameResult = "WhiteWins" | "BlackWins" | "Draw";
 
 export type GameResultReason =
@@ -31,6 +37,7 @@ export interface GameStateResponse {
   fen: string;
   turn: PlayerColor;
   yourColor: PlayerColor | null;
+  mode: GameMode;
   result: GameResult | null;
   resultReason: GameResultReason | null;
   moveCount: number;
@@ -57,7 +64,9 @@ export interface CreateGameResponse {
   gameId: string;
   playerToken: string;
   color: PlayerColor;
-  joinUrl: string;
+  mode: GameMode;
+  // Null for VsAi games, which have no second human seat to join.
+  joinUrl: string | null;
   gameState: GameStateResponse;
 }
 

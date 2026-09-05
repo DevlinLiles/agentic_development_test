@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ChessMvp.ChessAi\ChessMvp.ChessAi.csproj" />
     <ProjectReference Include="..\ChessMvp.Domain\ChessMvp.Domain.csproj" />
     <ProjectReference Include="..\ChessMvp.Infrastructure\ChessMvp.Infrastructure.csproj" />
   </ItemGroup>

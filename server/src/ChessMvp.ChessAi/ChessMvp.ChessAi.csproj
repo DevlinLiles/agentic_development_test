@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!--
+    The AI layer holds ONLY the abstractions and value types that describe how the
+    rest of the system talks to a chess AI player. It depends on the Domain for the
+    shared chess primitives (FEN, PlayerColor, LegalMove, PromotionPieceType) but has
+    no knowledge of any concrete AI implementation, so concrete players (minimax,
+    neural-net, external-engine adapters, random/baseline test players) can be added
+    in separate projects that reference this one and be injected/tested uniformly.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\ChessMvp.Domain\ChessMvp.Domain.csproj" />
+  </ItemGroup>
+
+  <!--
+    DI abstractions are referenced so this layer can expose its own AddChessAi
+    service-registration extension (mirroring AddChessInfrastructure in the
+    Infrastructure layer) and wire HeuristicChessAiPlayer / IHeuristicEvaluator into
+    the container without forcing every consumer project to perform the registration by
+    hand. Only the abstractions are needed; the concrete
+    Microsoft.Extensions.DependencyInjection container stays in the composition root
+    (ChessMvp.Api) and the test projects.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
+  </ItemGroup>
+
+</Project>

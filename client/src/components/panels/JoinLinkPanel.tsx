@@ -9,7 +9,18 @@ export interface JoinLinkPanelProps {
 export function JoinLinkPanel({ gameState }: JoinLinkPanelProps) {
   const [copied, setCopied] = useState(false);
 
-  if (gameState.status !== "WaitingForPlayer2" || gameState.yourColor !== "White") {
+  // The shareable join link only makes sense for a TwoPlayer game that is
+  // still waiting for a second human to claim the Black seat, and only for
+  // the waiting White player who created it. VsAi games have no second
+  // human seat (the server fills Black with a synthetic token and starts
+  // the game Active), so the panel is always hidden for them (AC-6) —
+  // independent of status, so a future status change can't accidentally
+  // surface a meaningless link.
+  if (
+    gameState.mode === "VsAi" ||
+    gameState.status !== "WaitingForPlayer2" ||
+    gameState.yourColor !== "White"
+  ) {
     return null;
   }
 

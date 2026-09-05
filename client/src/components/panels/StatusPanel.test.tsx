@@ -12,6 +12,7 @@ function makeGameState(overrides: Partial<GameStateResponse>): GameStateResponse
     fen: START_FEN,
     turn: "White",
     yourColor: "White",
+    mode: "TwoPlayer",
     result: null,
     resultReason: null,
     moveCount: 0,

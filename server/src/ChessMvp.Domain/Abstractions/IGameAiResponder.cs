@@ -4,7 +4,7 @@ namespace ChessMvp.Domain.Abstractions;
 
 /// <summary>
 /// A proposed reply move for an automated (AI) seat, expressed purely in domain chess
-/// primitives so <c>GameService</c can orchestrate it without depending on any concrete AI
+/// primitives so <c>GameService</c> can orchestrate it without depending on any concrete AI
 /// implementation. <see cref="PromotionPiece"/> is the promotion piece the engine chose when
 /// the move is a promotion, or <c>null</c> for non-promotion moves.
 /// </summary>

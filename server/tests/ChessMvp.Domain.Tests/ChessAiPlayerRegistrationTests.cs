@@ -1,6 +1,7 @@
 using ChessMvp.Domain.Abstractions;
 using ChessMvp.Domain.Ai;
 using ChessMvp.Infrastructure;
+using ChessMvp.Infrastructure.ChessRulesEngine;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 

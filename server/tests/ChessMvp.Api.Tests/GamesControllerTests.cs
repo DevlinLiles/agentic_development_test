@@ -61,6 +61,27 @@ public class GamesControllerTests
         Assert.NotNull(body);
         Assert.Equal(GameStatus.WaitingForPlayer2, body!.GameState.Status);
         Assert.NotEqual(Guid.Empty, body.PlayerToken);
+        // Backward compatible: omitting the mode parameter yields a two-player game with a join URL.
+        Assert.Equal(GameMode.TwoPlayer, body.Mode);
+        Assert.Equal(GameMode.TwoPlayer, body.GameState.Mode);
+        Assert.NotNull(body.JoinUrl);
+    }
+
+    [Fact]
+    public async Task CreateGame_WithVsAiMode_ReturnsActiveGameWithNullJoinUrl()
+    {
+        var response = await _client.PostAsync("/api/games?mode=VsAi", content: null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        // VsAi games fill the Black seat with the AI and go straight to Active.
+        Assert.Equal(GameMode.VsAi, body!.Mode);
+        Assert.Equal(GameMode.VsAi, body.GameState.Mode);
+        Assert.Equal(GameStatus.Active, body.GameState.Status);
+        // There is no second human player to join, so the join link must be omitted.
+        Assert.Null(body.JoinUrl);
+        Assert.NotEqual(Guid.Empty, body.PlayerToken);
     }
 
     [Fact]

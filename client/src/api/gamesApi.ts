@@ -5,14 +5,18 @@
 import { apiRequest } from "./httpClient";
 import type {
   CreateGameResponse,
+  GameMode,
   GameStateResponse,
   JoinGameResponse,
   MoveHistoryResponse,
   PromotionPieceType,
 } from "../types/gameTypes";
 
-export function createGame(): Promise<CreateGameResponse> {
-  return apiRequest<CreateGameResponse>("/api/games", { method: "POST" });
+// `mode` is optional and defaults to TwoPlayer on the server, so existing
+// callers that omit it keep the original two-player behavior.
+export function createGame(mode?: GameMode): Promise<CreateGameResponse> {
+  const query = mode ? `?mode=${encodeURIComponent(mode)}` : "";
+  return apiRequest<CreateGameResponse>(`/api/games${query}`, { method: "POST" });
 }
 
 export function joinGame(gameId: string): Promise<JoinGameResponse> {

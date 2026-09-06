@@ -12,6 +12,7 @@ public sealed record GameStateResponse(
     GameResultReason? ResultReason,
     int MoveCount,
     bool IsCheck,
+    GameMode Mode,
     LastMoveResponse? LastMove)
 {
     public static GameStateResponse FromGame(Game game, PlayerColor? yourColor)
@@ -30,6 +31,7 @@ public sealed record GameStateResponse(
             ResultReason: game.ResultReason,
             MoveCount: game.Moves.Count,
             IsCheck: lastMove?.IsCheck ?? false,
+            Mode: game.Mode,
             LastMove: lastMove is null
                 ? null
                 : new LastMoveResponse(lastMove.FromSquare, lastMove.ToSquare, lastMove.San));

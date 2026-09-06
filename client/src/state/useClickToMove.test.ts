@@ -23,6 +23,7 @@ function makeGameState(overrides: Partial<GameStateResponse> = {}): GameStateRes
     resultReason: null,
     moveCount: 0,
     isCheck: false,
+    mode: "TwoPlayer",
     lastMove: null,
     ...overrides,
   };

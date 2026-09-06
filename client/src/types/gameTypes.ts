@@ -19,6 +19,11 @@ export type GameResultReason =
 
 export type PromotionPieceType = "Queen" | "Rook" | "Bishop" | "Knight";
 
+// How a game's second seat is filled. TwoPlayer waits for a human to join via
+// the join link; VsAi fills the Black seat with the AI so the human (White) can
+// play immediately, and there is no shareable join URL.
+export type GameMode = "TwoPlayer" | "VsAi";
+
 export interface LastMove {
   from: string;
   to: string;
@@ -35,6 +40,7 @@ export interface GameStateResponse {
   resultReason: GameResultReason | null;
   moveCount: number;
   isCheck: boolean;
+  mode: GameMode;
   lastMove: LastMove | null;
 }
 
@@ -57,7 +63,9 @@ export interface CreateGameResponse {
   gameId: string;
   playerToken: string;
   color: PlayerColor;
-  joinUrl: string;
+  mode: GameMode;
+  // Null for VsAi games (no second player to join).
+  joinUrl: string | null;
   gameState: GameStateResponse;
 }
 

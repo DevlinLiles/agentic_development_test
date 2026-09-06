@@ -20,7 +20,16 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi();
 
 builder.Services.AddChessInfrastructure(builder.Configuration);
-builder.Services.AddScoped<IGameService, GameService>();
+
+// GameService needs the AI player to generate inline replies for VsAi games. AddChessInfrastructure
+// registers IChessAiPlayer, so we resolve it here alongside the rules engine and notifier. The
+// parameterless GameService ctor (without an AI player) remains available for tests that exercise
+// the two-player flow only.
+builder.Services.AddScoped<IGameService>(sp => new GameService(
+    sp.GetRequiredService<IGameRepository>(),
+    sp.GetRequiredService<IChessRulesEngine>(),
+    sp.GetRequiredService<IChessAiPlayer>(),
+    sp.GetService<IGameNotifier>()));
 builder.Services.AddSingleton<IGameNotifier, SignalRGameNotifier>();
 
 // Without this, SignalR's JSON hub protocol serializes enums as their underlying int, while the
@@ -59,7 +68,7 @@ if (app.Environment.IsDevelopment())
     db.Database.Migrate();
 }
 
-// This is a local-only MVP with no HTTPS/production requirement yet (see product spec):
+// This is a local-only MVP with no https/production requirement yet (see product spec):
 // redirecting to HTTPS in Development just forces every client onto the untrusted local dev
 // cert for no benefit, breaking plain-HTTP usage from both real browsers and test tooling
 // unless `dotnet dev-certs https --trust` has been run. Skip it outside Development.

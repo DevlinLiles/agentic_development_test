@@ -17,6 +17,8 @@ export type GameResultReason =
   | "FiftyMoveRule"
   | "Resignation";
 
+export type GameMode = "TwoPlayer" | "VsAi";
+
 export type PromotionPieceType = "Queen" | "Rook" | "Bishop" | "Knight";
 
 export interface LastMove {
@@ -27,6 +29,7 @@ export interface LastMove {
 
 export interface GameStateResponse {
   gameId: string;
+  mode: GameMode;
   status: GameStatus;
   fen: string;
   turn: PlayerColor;
@@ -57,7 +60,8 @@ export interface CreateGameResponse {
   gameId: string;
   playerToken: string;
   color: PlayerColor;
-  joinUrl: string;
+  mode: GameMode;
+  joinUrl: string | null;
   gameState: GameStateResponse;
 }
 

@@ -30,6 +30,8 @@ export interface ApiRequestOptions {
   /** Player token to send as X-Player-Token. Omit or pass null/undefined to send no auth header. */
   token?: string | null;
   body?: unknown;
+  /** Query-string entries; values are url-encoded and skipped when null/undefined. */
+  query?: Record<string, string | undefined | null>;
 }
 
 function safeJsonParse(text: string): unknown {
@@ -38,6 +40,17 @@ function safeJsonParse(text: string): unknown {
   } catch {
     return text;
   }
+}
+
+function buildQueryString(query: Record<string, string | undefined | null>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null) {
+      params.set(key, value);
+    }
+  }
+  const qs = params.toString();
+  return qs.length > 0 ? `?${qs}` : "";
 }
 
 export async function apiRequest<T>(
@@ -52,7 +65,9 @@ export async function apiRequest<T>(
     headers["X-Player-Token"] = options.token;
   }
 
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+  const queryString = options.query ? buildQueryString(options.query) : "";
+
+  const response = await fetch(`${getApiBaseUrl()}${path}${queryString}`, {
     method: options.method ?? "GET",
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,

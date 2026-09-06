@@ -9,7 +9,17 @@ export interface JoinLinkPanelProps {
 export function JoinLinkPanel({ gameState }: JoinLinkPanelProps) {
   const [copied, setCopied] = useState(false);
 
-  if (gameState.status !== "WaitingForPlayer2" || gameState.yourColor !== "White") {
+  // The shareable join link only exists for two-player games while the creator
+  // (White) waits for a human opponent to claim the Black seat. VsAi games fill
+  // the Black seat with the AI at creation time and go straight to Active, so
+  // there is never a second player to join and never a link to share. Hide the
+  // panel for VsAi games regardless of status (AC-6) — and, as before, hide it
+  // for everyone except the waiting White player in a two-player game.
+  if (
+    gameState.mode === "VsAi" ||
+    gameState.status !== "WaitingForPlayer2" ||
+    gameState.yourColor !== "White"
+  ) {
     return null;
   }
 

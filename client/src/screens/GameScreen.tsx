@@ -49,7 +49,13 @@ export function GameScreen() {
         const state = await gamesApi.getGameState(currentGameId);
         if (cancelled) return;
 
-        if (state.status !== "WaitingForPlayer2") {
+        // VsAi games have no second player to join — the AI fills the Black
+        // seat at creation time and the game starts Active, so skip the join
+        // path entirely for AI games. Only two-player games that are still
+        // waiting for an opponent go through join. A viewer with no saved
+        // session for an in-progress or AI game isn't a participant, so per
+        // the no-spectator spec they get a clear message instead of a board.
+        if (state.mode === "VsAi" || state.status !== "WaitingForPlayer2") {
           setNotParticipant(true);
           setGameState(state);
           return;

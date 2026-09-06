@@ -9,7 +9,16 @@ export interface JoinLinkPanelProps {
 export function JoinLinkPanel({ gameState }: JoinLinkPanelProps) {
   const [copied, setCopied] = useState(false);
 
-  if (gameState.status !== "WaitingForPlayer2" || gameState.yourColor !== "White") {
+  // The join link exists to invite a human opponent into an open seat. A VsAi
+  // game has no open seat — the AI is the opponent and the game starts Active
+  // immediately — so the panel must never render for AI games (AC-6). It is
+  // also only relevant while the creator (White) is still waiting for a human
+  // to claim Black; once active or for the joining player it stays hidden.
+  if (
+    gameState.mode === "VsAi" ||
+    gameState.status !== "WaitingForPlayer2" ||
+    gameState.yourColor !== "White"
+  ) {
     return null;
   }
 

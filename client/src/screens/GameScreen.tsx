@@ -49,6 +49,17 @@ export function GameScreen() {
         const state = await gamesApi.getGameState(currentGameId);
         if (cancelled) return;
 
+        // VsAi games have no second human seat to claim — the AI is the
+        // opponent and the game starts Active immediately. Skip the join
+        // path entirely; a session-less viewer of an AI game has no seat to
+        // claim (no spectator mode, per spec), so surface the
+        // not-a-participant message rather than attempting to join.
+        if (state.mode === "VsAi") {
+          setNotParticipant(true);
+          setGameState(state);
+          return;
+        }
+
         if (state.status !== "WaitingForPlayer2") {
           setNotParticipant(true);
           setGameState(state);

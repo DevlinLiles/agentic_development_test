@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as gamesApi from "../api/gamesApi";
 import { useGameSession } from "../state/useGameSession";
+import { OpponentTypeSelector } from "../components/panels/OpponentTypeSelector";
 import { describeApiError } from "../utils/describeApiError";
+import type { OpponentType } from "../types/gameTypes";
 import "./createGameScreen.css";
 
 export function CreateGameScreen() {
@@ -10,12 +12,14 @@ export function CreateGameScreen() {
   const { saveSession } = useGameSession();
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Default to Human (legacy behavior) per AC-1.1.
+  const [opponentType, setOpponentType] = useState<OpponentType>("Human");
 
   const handleCreate = async () => {
     setIsCreating(true);
     setError(null);
     try {
-      const response = await gamesApi.createGame();
+      const response = await gamesApi.createGame(opponentType);
       saveSession({
         gameId: response.gameId,
         playerToken: response.playerToken,
@@ -31,7 +35,12 @@ export function CreateGameScreen() {
   return (
     <div className="create-game-screen">
       <h1>Online Chess</h1>
-      <p>Start a new game and share the link with your opponent.</p>
+      <p>Start a new game against a friend or the computer.</p>
+      <OpponentTypeSelector
+        value={opponentType}
+        onChange={setOpponentType}
+        disabled={isCreating}
+      />
       <button type="button" onClick={handleCreate} disabled={isCreating}>
         {isCreating ? "Creating…" : "Create Game"}
       </button>

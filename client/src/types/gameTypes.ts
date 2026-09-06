@@ -19,6 +19,11 @@ export type GameResultReason =
 
 export type PromotionPieceType = "Queen" | "Rook" | "Bishop" | "Knight";
 
+// Mirrors the server-side OpponentType enum (serialized as string via
+// JsonStringEnumConverter). default(OpponentType) == "Human" preserves
+// legacy human-vs-human behavior when omitted.
+export type OpponentType = "Human" | "Ai";
+
 export interface LastMove {
   from: string;
   to: string;
@@ -51,6 +56,10 @@ export interface MoveHistoryEntry {
 
 export interface MoveHistoryResponse {
   moves: MoveHistoryEntry[];
+}
+
+export interface CreateGameRequest {
+  opponentType?: OpponentType;
 }
 
 export interface CreateGameResponse {

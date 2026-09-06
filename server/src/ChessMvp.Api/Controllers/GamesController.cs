@@ -20,9 +20,9 @@ public class GamesController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<CreateGameResponse>> CreateGame()
+    public async Task<ActionResult<CreateGameResponse>> CreateGame([FromQuery] GameMode mode = GameMode.TwoPlayer)
     {
-        var game = await _gameService.CreateGameAsync();
+        var game = await _gameService.CreateGameAsync(mode);
 
         // The client owns its own origin, so we hand back a relative path rather than guessing
         // the client's scheme/host from this API request.

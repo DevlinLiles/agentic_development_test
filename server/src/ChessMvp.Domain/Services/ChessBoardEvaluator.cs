@@ -186,22 +186,10 @@ public sealed class ChessBoardEvaluator : IChessBoardEvaluator
         ['k'] = 0,
     };
 
-    /// <summary>
-    /// Piece-square tables indexed by lower-case piece character. Each table is an 8x8 grid in the
-    /// standard PeSTO orientation: row 0 is rank 8 (black's back rank), column 0 is file a. Values
-    /// encourage central pawns and knights toward the centre / away from the edges. Pawns and
-    /// knights are defined per the acceptance criteria; bishops, rooks, the queen and the king are
-    /// provided as well for a complete, consistent evaluation.
-    /// </summary>
-    private static readonly Dictionary<char, int[][]> PieceSquareTables = new()
-    {
-        ['p'] = PawnTable,
-        ['n'] = KnightTable,
-        ['b'] = BishopTable,
-        ['r'] = RookTable,
-        ['q'] = QueenTable,
-        ['k'] = KingTable,
-    };
+    // The piece-square tables MUST be declared before the PieceSquareTables dictionary that
+    // references them: C# initialises static fields in textual order, so declaring the dictionary
+    // first would capture null for every table. Defining the tables above the dictionary ensures
+    // each entry captures its fully-initialised array.
 
     // Pawn table: row 0 == rank 8. Rewards advancement and central control; the back ranks
     // (where pawns cannot stand) are zero.
@@ -276,5 +264,22 @@ public sealed class ChessBoardEvaluator : IChessBoardEvaluator
         new[] { -10,-20,-20,-20,-20,-20,-20,-10 }, // rank 3
         new[] {  20, 20,  0,  0,  0,  0, 20, 20 }, // rank 2
         new[] {  20, 30, 10,  0,  0, 10, 30, 20 }, // rank 1 (castled / safe)
+    };
+
+    /// <summary>
+    /// Piece-square tables indexed by lower-case piece character. Each table is an 8x8 grid in the
+    /// standard PeSTO orientation: row 0 is rank 8 (black's back rank), column 0 is file a. Values
+    /// encourage central pawns and knights toward the centre / away from the edges. Pawns and
+    /// knights are defined per the acceptance criteria; bishops, rooks, the queen and the king are
+    /// provided as well for a complete, consistent evaluation.
+    /// </summary>
+    private static readonly Dictionary<char, int[][]> PieceSquareTables = new()
+    {
+        ['p'] = PawnTable,
+        ['n'] = KnightTable,
+        ['b'] = BishopTable,
+        ['r'] = RookTable,
+        ['q'] = QueenTable,
+        ['k'] = KingTable,
     };
 }

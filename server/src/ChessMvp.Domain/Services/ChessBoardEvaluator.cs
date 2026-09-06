@@ -47,6 +47,16 @@ public sealed class ChessBoardEvaluator : IChessBoardEvaluator
         }
 
         var placement = fields[0];
+
+        // A structurally invalid placement (not eight ranks, ranks that do not sum to eight files,
+        // or characters that are neither piece letters nor run-length digits) does not describe a
+        // real position. Tallying "material" from such garbage would produce a meaningless score,
+        // so degrade gracefully to zero rather than misreporting an advantage that does not exist.
+        if (!IsValidPlacement(placement))
+        {
+            return 0;
+        }
+
         var sideToMove = ParseSideToMove(fields);
 
         var (whiteMaterial, blackMaterial) = TallyMaterial(placement);
@@ -66,6 +76,63 @@ public sealed class ChessBoardEvaluator : IChessBoardEvaluator
         return sideToMove == PlayerColor.White
             ? materialPerspective + mobility * MobilityWeight
             : -materialPerspective + mobility * MobilityWeight;
+    }
+
+    /// <summary>
+    /// Validates the piece-placement field of a FEN. A valid placement is exactly eight ranks
+    /// separated by '/', where each rank's squares (piece letters counting one file each and
+    /// digit run-lengths counting their numeric value) sum to exactly eight files and every
+    /// character is a recognised piece letter or a digit 1-8. Returns false for any malformed
+    /// placement so the evaluator can fall back to a neutral score instead of scoring garbage.
+    /// </summary>
+    private static bool IsValidPlacement(string placement)
+    {
+        var ranks = placement.Split('/');
+        if (ranks.Length != 8)
+        {
+            return false;
+        }
+
+        foreach (var rank in ranks)
+        {
+            if (string.IsNullOrEmpty(rank))
+            {
+                return false;
+            }
+
+            var files = 0;
+            foreach (var ch in rank)
+            {
+                if (char.IsDigit(ch))
+                {
+                    // FEN encodes empty-square runs with the digits 1-8; anything outside that
+                    // range is not a valid run length.
+                    if (ch is < '1' or > '8')
+                    {
+                        return false;
+                    }
+
+                    files += ch - '0';
+                }
+                else if (PieceMaterial.ContainsKey(char.ToLowerInvariant(ch)))
+                {
+                    files++;
+                }
+                else
+                {
+                    // Any character that is neither a piece letter nor a run-length digit makes the
+                    // placement invalid.
+                    return false;
+                }
+            }
+
+            if (files != 8)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static (int White, int Black) TallyMaterial(string placement)

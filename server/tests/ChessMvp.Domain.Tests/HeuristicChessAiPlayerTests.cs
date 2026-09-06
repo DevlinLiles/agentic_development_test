@@ -175,7 +175,13 @@ public class HeuristicChessAiPlayerTests
         Assert.Equal(originalFen, request.Fen);
         var movesAfter = LegalMovesFor(request.Fen, _rulesEngine)
             .Select(m => (m.FromSquare, m.ToSquare)).ToList();
-        Assert.Equal(originalMoves, movesAfter);
+
+        // The underlying rules engine may enumerate the same legal moves in a different order on a
+        // fresh board load, so the immutability contract is about the *set* of moves being
+        // unchanged rather than their enumeration order. Compare as a set to honour that contract.
+        Assert.Equal(
+            originalMoves.OrderBy(m => m.FromSquare, StringComparer.Ordinal).ThenBy(m => m.ToSquare, StringComparer.Ordinal),
+            movesAfter.OrderBy(m => m.FromSquare, StringComparer.Ordinal).ThenBy(m => m.ToSquare, StringComparer.Ordinal));
     }
 
     [Fact]

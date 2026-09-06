@@ -18,4 +18,11 @@ public interface IChessRulesEngine
     IReadOnlySet<string> GetLegalDestinations(string fen, string fromSquare);
 
     bool IsPromotionMove(string fen, string fromSquare, string toSquare);
+
+    /// <summary>
+    /// Enumerates every legal move for the side to move in <paramref name="fen"/>, mapped from the
+    /// underlying engine's move objects to <see cref="LegalMove"/> records (including promotion
+    /// detection). Returns an empty collection when the FEN is invalid or the position is terminal.
+    /// </summary>
+    IReadOnlyList<LegalMove> GetAllLegalMoves(string fen);
 }

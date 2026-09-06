@@ -7,10 +7,43 @@
   text-align: center;
 }
 
-.create-game-screen button {
+.create-game-screen__options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+  max-width: 24rem;
+}
+
+.create-game-screen__option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
   font-size: 1.1rem;
-  padding: 0.6rem 1.5rem;
+  padding: 0.9rem 1.5rem;
   cursor: pointer;
+  border: 1px solid #cfcfcf;
+  border-radius: 0.5rem;
+  background: #fafafa;
+}
+
+.create-game-screen__option:hover:not(:disabled) {
+  border-color: #1976d2;
+  background: #fff;
+}
+
+.create-game-screen__option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.create-game-screen__option-title {
+  font-weight: 600;
+}
+
+.create-game-screen__option-subtitle {
+  font-size: 0.9rem;
+  color: #555;
 }
 
 .create-game-screen__error {

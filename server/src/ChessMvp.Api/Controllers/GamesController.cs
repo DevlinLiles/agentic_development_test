@@ -19,19 +19,25 @@ public class GamesController : ControllerBase
         _gameService = gameService;
     }
 
+    // `mode` is optional and defaults to TwoPlayer so existing clients that post with no query
+    // string (or no body) keep the original two-player behavior. Accepting it from the query
+    // string keeps the request body-free for the (currently body-less) create endpoint and lets a
+    // human/AI client opt into VsAi via `?mode=VsAi`.
     [HttpPost]
-    public async Task<ActionResult<CreateGameResponse>> CreateGame()
+    public async Task<ActionResult<CreateGameResponse>> CreateGame([FromQuery] GameMode mode = GameMode.TwoPlayer)
     {
-        var game = await _gameService.CreateGameAsync();
+        var game = await _gameService.CreateGameAsync(mode);
 
-        // The client owns its own origin, so we hand back a relative path rather than guessing
-        // the client's scheme/host from this API request.
-        var joinUrl = $"/game/{game.Id}";
+        // VsAi games have no second player to join, so there is no shareable join link. The client
+        // owns its own origin, so for two-player games we hand back a relative path rather than
+        // guessing the client's scheme/host from this API request.
+        string? joinUrl = game.Mode == GameMode.VsAi ? null : $"/game/{game.Id}";
 
         var response = new CreateGameResponse(
             GameId: game.Id,
             PlayerToken: game.WhiteSlotToken!.Value,
             Color: PlayerColor.White,
+            Mode: game.Mode,
             JoinUrl: joinUrl,
             GameState: GameStateResponse.FromGame(game, PlayerColor.White));
 

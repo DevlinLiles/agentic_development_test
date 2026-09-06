@@ -1,4 +1,5 @@
 using ChessMvp.Domain.Abstractions;
+using ChessMvp.Domain.Services;
 using ChessMvp.Infrastructure.ChessRulesEngine;
 using ChessMvp.Infrastructure.Persistence;
 using ChessMvp.Infrastructure.Persistence.Repositories;
@@ -19,6 +20,8 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IGameRepository, GameRepository>();
         services.AddSingleton<IChessRulesEngine, GerasimleoChessRulesEngineAdapter>();
+        services.AddSingleton<IChessBoardEvaluator, ChessBoardEvaluator>();
+        services.AddSingleton<IChessAiPlayer, HeuristicChessAiPlayer>();
 
         return services;
     }

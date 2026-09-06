@@ -90,6 +90,45 @@ public sealed class GerasimleoChessRulesEngineAdapter : IChessRulesEngine
             return false;
         }
 
+        return IsPawnPromotion(board, fromSquare, toSquare);
+    }
+
+    public IReadOnlyList<LegalMove> GetAllLegalMoves(string fen)
+    {
+        if (!ChessBoard.TryLoadFromFen(fen, out var board, EnabledDrawRules))
+        {
+            return Array.Empty<LegalMove>();
+        }
+
+        // The board is terminal (checkmate/stalemate) when there are no legal moves; Moves() simply
+        // yields nothing in that case, so no special handling is required beyond mapping each move.
+        return board.Moves()
+            .Select(m => ToLegalMove(board, m))
+            .ToList();
+    }
+
+    private static LegalMove ToLegalMove(ChessBoard board, EngineMove move)
+    {
+        var fromSquare = move.OriginalPosition.ToString();
+        var toSquare = move.NewPosition.ToString();
+
+        return new LegalMove
+        {
+            FromSquare = fromSquare,
+            ToSquare = toSquare,
+            San = move.San,
+            IsCheck = move.IsCheck,
+            IsCheckmate = move.IsMate,
+            // Reuse the same pawn-to-back-rank heuristic as IsPromotionMove so the two paths stay
+            // consistent: a move is a promotion iff a pawn departs for the 1st/8th rank.
+            IsPromotion = IsPawnPromotion(board, fromSquare, toSquare),
+        };
+    }
+
+    // Shared promotion heuristic used by both IsPromotionMove and GetAllLegalMoves so the public
+    // predicate and the enumerated LegalMove.IsPromotion flag can never disagree.
+    private static bool IsPawnPromotion(ChessBoard board, string fromSquare, string toSquare)
+    {
         var piece = board[fromSquare];
         if (piece is null || piece.Type != PieceType.Pawn)
         {

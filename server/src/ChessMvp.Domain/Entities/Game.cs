@@ -4,6 +4,8 @@ public class Game
 {
     public Guid Id { get; set; }
 
+    public GameMode Mode { get; set; } = GameMode.TwoPlayer;
+
     public Guid? WhiteSlotToken { get; set; }
 
     public Guid? BlackSlotToken { get; set; }

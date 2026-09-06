@@ -5,14 +5,18 @@
 import { apiRequest } from "./httpClient";
 import type {
   CreateGameResponse,
+  GameMode,
   GameStateResponse,
   JoinGameResponse,
   MoveHistoryResponse,
   PromotionPieceType,
 } from "../types/gameTypes";
 
-export function createGame(): Promise<CreateGameResponse> {
-  return apiRequest<CreateGameResponse>("/api/games", { method: "POST" });
+export function createGame(mode: GameMode = "TwoPlayer"): Promise<CreateGameResponse> {
+  return apiRequest<CreateGameResponse>("/api/games", {
+    method: "POST",
+    query: { mode },
+  });
 }
 
 export function joinGame(gameId: string): Promise<JoinGameResponse> {

@@ -11,11 +11,53 @@ services:
     volumes:
       - chessmvp-sqldata:/var/opt/mssql
     healthcheck:
+      # sqlcmd is present in the base image under mssql-tools18; -C trusts the
+      # self-signed cert. SQL Server's internal system-db upgrade on a fresh
+      # volume can take 3+ minutes, so stay generous here.
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 20s
+      retries: 20
+      start_period: 60s
+
+  api:
+    build:
+      context: .
+      dockerfile: server/src/ChessMvp.Api/Dockerfile
+    container_name: chessmvp-api
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://0.0.0.0:5112"
+      ConnectionStrings__ChessMvpDb: "Server=sqlserver,1433;Database=ChessMvp;User Id=sa;Password=ChessMvp!Local2026;TrustServerCertificate=True"
+      Cors__ClientOrigin: "http://localhost:5173"
+    ports:
+      - "5112:5112"
+    healthcheck:
+      # The API exposes OpenAPI in Development at /openapi/v1.json. Generous
+      # start_period/retries cover SQL Server's slow readiness plus the API's
+      # own EF Core migration-on-startup.
+      test: ["CMD-SHELL", "curl --fail http://localhost:5112/openapi/v1.json || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 200s
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+      args:
+        VITE_API_BASE_URL: "http://localhost:5112"
+        VITE_HUB_URL: "http://localhost:5112/hubs/game"
+    container_name: chessmvp-client
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
 
 volumes:
   chessmvp-sqldata:

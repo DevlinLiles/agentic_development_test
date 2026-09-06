@@ -4,6 +4,7 @@ namespace ChessMvp.Api.Contracts;
 
 public sealed record GameStateResponse(
     Guid GameId,
+    GameMode Mode,
     GameStatus Status,
     string Fen,
     PlayerColor Turn,
@@ -22,6 +23,7 @@ public sealed record GameStateResponse(
 
         return new GameStateResponse(
             GameId: game.Id,
+            Mode: game.Mode,
             Status: game.Status,
             Fen: game.CurrentFen,
             Turn: game.Turn,

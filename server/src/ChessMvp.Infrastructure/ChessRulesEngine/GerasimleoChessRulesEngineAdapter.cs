@@ -90,6 +90,44 @@ public sealed class GerasimleoChessRulesEngineAdapter : IChessRulesEngine
             return false;
         }
 
+        return IsPawnPromotion(board, fromSquare, toSquare);
+    }
+
+    public IReadOnlyList<LegalMove> GetAllLegalMoves(string fen)
+    {
+        if (!ChessBoard.TryLoadFromFen(fen, out var board, EnabledDrawRules))
+        {
+            return Array.Empty<LegalMove>();
+        }
+
+        // board.Moves() yields the pseudo-legal candidates that the engine has already filtered
+        // for legality (leaving the moving side's king in check is excluded), so each one maps
+        // directly to a domain LegalMove. No mutation occurs here, so the board stays consistent
+        // while we read the piece at each move's origin for promotion detection.
+        return board.Moves()
+            .Select(m => ToLegalMove(board, m))
+            .ToList();
+    }
+
+    private static LegalMove ToLegalMove(ChessBoard board, EngineMove move)
+    {
+        var fromSquare = move.OriginalPosition.ToString();
+        var toSquare = move.NewPosition.ToString();
+
+        return new LegalMove
+        {
+            FromSquare = fromSquare,
+            ToSquare = toSquare,
+            San = move.San,
+            IsPromotion = IsPawnPromotion(board, fromSquare, toSquare),
+        };
+    }
+
+    // Shared promotion heuristic: a move is a promotion iff the moving piece is a pawn and its
+    // destination square is on the back rank. Reused by IsPromotionMove and the move enumeration so
+    // both code paths agree on what counts as a promotion.
+    private static bool IsPawnPromotion(ChessBoard board, string fromSquare, string toSquare)
+    {
         var piece = board[fromSquare];
         if (piece is null || piece.Type != PieceType.Pawn)
         {

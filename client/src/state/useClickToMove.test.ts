@@ -15,6 +15,7 @@ const PROMOTION_FEN = "8/4P3/8/8/8/8/7k/7K w - - 0 40";
 function makeGameState(overrides: Partial<GameStateResponse> = {}): GameStateResponse {
   return {
     gameId: "game-1",
+    mode: "TwoPlayer",
     status: "Active",
     fen: START_FEN,
     turn: "White",

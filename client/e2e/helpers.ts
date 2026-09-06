@@ -1,10 +1,20 @@
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
 
-/** Creates a new game from the landing screen and returns its id (parsed from the URL). */
+/** Creates a new two-player game from the landing screen and returns its id (parsed from the URL). */
 export async function createGame(page: Page): Promise<string> {
   await page.goto("/");
   await page.getByRole("button", { name: "Create Game" }).click();
+  await page.waitForURL(/\/game\/[0-9a-f-]{36}/);
+  const match = page.url().match(/\/game\/([0-9a-f-]{36})/);
+  if (!match) throw new Error(`Could not parse game id from URL: ${page.url()}`);
+  return match[1];
+}
+
+/** Creates a new vs-AI game from the landing screen and returns its id (parsed from the URL). */
+export async function createVsAiGame(page: Page): Promise<string> {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Play vs Computer" }).click();
   await page.waitForURL(/\/game\/[0-9a-f-]{36}/);
   const match = page.url().match(/\/game\/([0-9a-f-]{36})/);
   if (!match) throw new Error(`Could not parse game id from URL: ${page.url()}`);

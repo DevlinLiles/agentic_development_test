@@ -81,15 +81,16 @@ public class HeuristicChessAiPlayerTests
     [Fact]
     public async Task SelectMoveAsync_GreedyWhite_CapturesFreeQueen()
     {
-        // White bishop on d4 can capture the undefended black queen on a1.
-        const string fen = "7k/8/8/8/8/3B4/8/q3K3 w - - 0 1";
+        // White bishop on e4 can capture the undefended black queen on a8 along the clear
+        // e4-d5-c6-b7-a8 diagonal.
+        const string fen = "q3k3/8/8/8/4B3/8/8/4K3 w - - 0 1";
         var sut = CreateSut();
 
         var result = await sut.SelectMoveAsync(fen, PlayerColor.White, AiSearchOptions.Shallow(1));
 
         Assert.Equal(AiMoveStatus.MoveSelected, result.Status);
-        Assert.Equal("d3", result.FromSquare);
-        Assert.Equal("a1", result.ToSquare);
+        Assert.Equal("e4", result.FromSquare);
+        Assert.Equal("a8", result.ToSquare);
         Assert.Equal(1, result.SearchDepthInPlies);
         // Capturing the black queen gains ~9 points of material from White's perspective.
         Assert.True(result.EvaluationScore > 0);
@@ -98,15 +99,16 @@ public class HeuristicChessAiPlayerTests
     [Fact]
     public async Task SelectMoveAsync_GreedyBlack_CapturesFreeRook()
     {
-        // Black knight on f6 can capture the undefended white rook on e4.
-        const string fen = "4k3/8/5n2/8/4R3/8/8/4K3 b - - 0 1";
+        // Black knight on f6 can capture the undefended white rook on d5 (knight jump); the black
+        // king on e8 is not in check from the rook (d5 is off the e-file and rank 8).
+        const string fen = "4k3/8/5n2/3R4/8/8/8/4K3 b - - 0 1";
         var sut = CreateSut();
 
         var result = await sut.SelectMoveAsync(fen, PlayerColor.Black, AiSearchOptions.Shallow(1));
 
         Assert.Equal(AiMoveStatus.MoveSelected, result.Status);
         Assert.Equal("f6", result.FromSquare);
-        Assert.Equal("e4", result.ToSquare);
+        Assert.Equal("d5", result.ToSquare);
         // From Black's perspective the score is the negation of White's, so capturing White's
         // rook yields a positive score for Black.
         Assert.True(result.EvaluationScore > 0);
@@ -130,10 +132,10 @@ public class HeuristicChessAiPlayerTests
     }
 
     [Fact]
-    public async Task SelectMoveAsync_Determinism_HoldsAcrossShuffledEquivalentCalls()
+    public async Task SelectMoveAsync_Determinism_RepeatedCallsYieldSameResult()
     {
-        // A symmetrical position with several equally-scoring moves exercises the tie-break: the
-        // selected move must be stable regardless of how many times we ask.
+        // The starting position has several equally-scoring moves (no captures), which exercises
+        // the tie-break: the selected move must be stable across repeated identical requests.
         const string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         var sut = CreateSut();
 
@@ -199,10 +201,11 @@ public class HeuristicChessAiPlayerTests
     }
 
     [Fact]
-    public async Task SelectMoveAsync_StubsEvaluatorOncePerLegalMove()
+    public async Task SelectMoveAsync_EvaluatesEveryLegalMoveAtOnePly()
     {
-        // Verifies the 1-ply search actually evaluates every legal move (at least the resulting
-        // FENs) by counting evaluator calls against the number of legal moves in the position.
+        // Verifies the 1-ply search actually evaluates every legal move (the resulting FEN) by
+        // counting evaluator calls against the number of legal moves in the position. The starting
+        // position has 20 legal moves and no promotions, so each yields exactly one call.
         const string fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
         var rulesEngine = new GerasimleoChessRulesEngineAdapter();
         var evaluator = Substitute.For<IHeuristicEvaluator>();
@@ -213,7 +216,6 @@ public class HeuristicChessAiPlayerTests
 
         await sut.SelectMoveAsync(fen, PlayerColor.White, AiSearchOptions.Shallow(1));
 
-        // Each non-promotion legal move yields exactly one evaluator call.
         Assert.Equal(legalMoveCount, evaluator.ReceivedCalls().Count());
     }
 }

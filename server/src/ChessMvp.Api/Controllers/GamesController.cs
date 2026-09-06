@@ -25,13 +25,15 @@ public class GamesController : ControllerBase
         var game = await _gameService.CreateGameAsync(mode);
 
         // The client owns its own origin, so we hand back a relative path rather than guessing
-        // the client's scheme/host from this API request.
-        var joinUrl = $"/game/{game.Id}";
+        // the client's scheme/host from this API request. VsAi games have no second human seat to
+        // join, so there is no shareable link; omit the join URL entirely in that case.
+        string? joinUrl = mode == GameMode.VsAi ? null : $"/game/{game.Id}";
 
         var response = new CreateGameResponse(
             GameId: game.Id,
             PlayerToken: game.WhiteSlotToken!.Value,
             Color: PlayerColor.White,
+            Mode: game.Mode,
             JoinUrl: joinUrl,
             GameState: GameStateResponse.FromGame(game, PlayerColor.White));
 

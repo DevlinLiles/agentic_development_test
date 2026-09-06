@@ -64,6 +64,39 @@ public class GamesControllerTests
     }
 
     [Fact]
+    public async Task CreateGame_WithoutMode_DefaultsToTwoPlayerWithJoinUrl()
+    {
+        // Backward compatibility: a client that omits the mode parameter gets TwoPlayer behavior,
+        // including a shareable join URL.
+        var response = await _client.PostAsync("/api/games", content: null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameMode.TwoPlayer, body!.Mode);
+        Assert.Equal(GameMode.TwoPlayer, body.GameState.Mode);
+        Assert.Equal(GameStatus.WaitingForPlayer2, body.GameState.Status);
+        Assert.NotNull(body.JoinUrl);
+        Assert.Contains(body.GameId.ToString(), body.JoinUrl);
+    }
+
+    [Fact]
+    public async Task CreateGame_WithVsAiMode_IsActiveWithNullJoinUrlAndModeInState()
+    {
+        var response = await _client.PostAsync("/api/games?mode=VsAi", content: null);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<CreateGameResponse>(JsonOptions);
+        Assert.NotNull(body);
+        Assert.Equal(GameMode.VsAi, body!.Mode);
+        Assert.Equal(GameMode.VsAi, body.GameState.Mode);
+        // VsAi games start active immediately with the human on White — no second seat to join.
+        Assert.Equal(GameStatus.Active, body.GameState.Status);
+        Assert.Null(body.JoinUrl);
+        Assert.NotEqual(Guid.Empty, body.PlayerToken);
+    }
+
+    [Fact]
     public async Task FullGameFlow_FoolsMate_EndsInCheckmateWithCorrectHistory()
     {
         var (gameId, whiteToken) = await CreateGameAsync();

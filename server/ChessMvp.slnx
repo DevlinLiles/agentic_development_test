@@ -7,5 +7,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/ChessMvp.Api.Tests/ChessMvp.Api.Tests.csproj" />
     <Project Path="tests/ChessMvp.Domain.Tests/ChessMvp.Domain.Tests.csproj" />
+    <Project Path="tests/ChessMvp.Infrastructure.Tests/ChessMvp.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

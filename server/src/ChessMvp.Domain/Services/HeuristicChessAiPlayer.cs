@@ -38,6 +38,13 @@ public sealed class HeuristicChessAiPlayer : IChessAiPlayer
         _evaluator = evaluator;
     }
 
+    /// <summary>
+    /// The board evaluator injected into this player. Exposed as a read-only property so that
+    /// dependency-injection wiring can be verified without reflection — the evaluator is a
+    /// singleton, so the instance held by the player must match the one the container resolves.
+    /// </summary>
+    public IChessBoardEvaluator Evaluator => _evaluator;
+
     /// <inheritdoc/>
     public Task<ChessAiMoveResult> ChooseMoveAsync(
         ChessAiMoveRequest request,

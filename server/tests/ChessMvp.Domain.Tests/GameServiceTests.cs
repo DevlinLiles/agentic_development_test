@@ -49,6 +49,17 @@ public class GameServiceTests
     }
 
     [Fact]
+    public async Task CreateGameAsync_SeedsHumanOpponentMode()
+    {
+        // New games must carry an explicit Human discriminator (not null, and not silently left
+        // to the column default) so the in-memory entity matches a database round-trip and the
+        // discriminator is always written on insert.
+        var game = await _sut.CreateGameAsync();
+
+        Assert.Equal(OpponentMode.Human, game.OpponentMode);
+    }
+
+    [Fact]
     public async Task JoinGameAsync_UnknownGame_ThrowsGameNotFoundException()
     {
         _repository.GetByIdAsync(Arg.Any<Guid>()).Returns((Game?)null);

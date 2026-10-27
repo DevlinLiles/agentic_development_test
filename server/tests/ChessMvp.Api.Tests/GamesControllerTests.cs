@@ -61,6 +61,11 @@ public class GamesControllerTests
         Assert.NotNull(body);
         Assert.Equal(GameStatus.WaitingForPlayer2, body!.GameState.Status);
         Assert.NotEqual(Guid.Empty, body.PlayerToken);
+
+        // The opponent-mode discriminator must reach the client on the game state. It round-trips
+        // the database (the AddOpponentModeToGame migration is applied by this factory's
+        // Development-environment boot path), so this also proves the EF Core mapping persists it.
+        Assert.Equal(OpponentMode.Human, body.GameState.OpponentMode);
     }
 
     [Fact]

@@ -5,6 +5,7 @@ using ChessMvp.Domain.Services;
 using ChessMvp.Infrastructure;
 using ChessMvp.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,11 @@ builder.Services.AddControllers()
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Liveness endpoint for the containerized deployment's HEALTHCHECK (see
+// docker-compose.yml). No database checks are registered on purpose: it must only
+// prove that the HTTP server itself is up and accepting requests.
+builder.Services.AddHealthChecks();
 
 builder.Services.AddChessInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IGameService, GameService>();
@@ -56,7 +62,31 @@ if (app.Environment.IsDevelopment())
 
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ChessDbContext>();
-    db.Database.Migrate();
+
+    // A containerized cold start races SQL Server's real readiness: the database
+    // container's own HEALTHCHECK can already pass while the engine is still finishing
+    // its internal system-database setup, and a single failed migration would kill the
+    // app's first boot. Retry with backoff when configured (docker-compose.yml sets
+    // Database__MigrateRetryAttempts=60); local and test hosts keep the default
+    // single, fail-fast attempt.
+    var migrateRetryAttempts = builder.Configuration.GetValue("Database:MigrateRetryAttempts", 1);
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            db.Database.Migrate();
+            break;
+        }
+        catch (Exception ex) when (attempt < migrateRetryAttempts)
+        {
+            app.Logger.LogWarning(
+                ex,
+                "Database migration attempt {Attempt}/{Total} failed; retrying in 5s.",
+                attempt,
+                migrateRetryAttempts);
+            await Task.Delay(TimeSpan.FromSeconds(5));
+        }
+    }
 }
 
 // This is a local-only MVP with no HTTPS/production requirement yet (see product spec):
@@ -74,6 +104,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<GameHub>("/hubs/game");
+app.MapHealthChecks("/health");
 
 app.Run();
 

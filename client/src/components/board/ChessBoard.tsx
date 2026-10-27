@@ -43,7 +43,10 @@ export function ChessBoard({ gameId, playerToken, yourColor, gameState, onStateU
         </div>
       )}
 
-      <div className={`chess-board ${clickToMove.isAwaitingServer ? "chess-board--busy" : ""}`}>
+      <div
+        className={`chess-board ${clickToMove.isAwaitingServer ? "chess-board--busy" : ""}`}
+        aria-busy={clickToMove.isAwaitingServer ? "true" : undefined}
+      >
         {orientedRows.map((row) => {
           const orientedSquares = yourColor === "Black" ? [...row].reverse() : row;
           return orientedSquares.map((cell) => {

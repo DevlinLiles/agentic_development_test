@@ -49,6 +49,9 @@ export function GameScreen() {
         const state = await gamesApi.getGameState(currentGameId);
         if (cancelled) return;
 
+        // AI games are Active at creation and their second seat can never be
+        // joined, so an un-seated visitor is never a spectator-in-waiting —
+        // they land in the not-a-participant message below.
         if (state.status !== "WaitingForPlayer2") {
           setNotParticipant(true);
           setGameState(state);
@@ -125,10 +128,12 @@ export function GameScreen() {
     return <p role="alert">Unable to load game state.</p>;
   }
 
+  const isComputerGame = gameState.opponentType === "Computer";
+
   return (
     <div className="game-screen">
       <StatusPanel gameState={gameState} />
-      <JoinLinkPanel gameState={gameState} />
+      {!isComputerGame && <JoinLinkPanel gameState={gameState} />}
       <div className="game-screen__layout">
         <ChessBoard
           gameId={gameId}

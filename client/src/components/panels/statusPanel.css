@@ -20,3 +20,33 @@
   font-weight: 600;
   margin-top: 0.25rem;
 }
+
+/* Computer-game status lines. The reply line sits above the turn line so the
+   announcement order is "Computer played …" then "Your turn". */
+.status-panel__ai-reply {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  color: var(--text-h);
+  font-family: var(--mono);
+  font-size: 0.95rem;
+}
+
+.status-panel__opponent {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .status-panel {
+    background-color: #1f2028;
+  }
+
+  .status-panel--ended {
+    background-color: #38301d;
+  }
+
+  .status-panel__check {
+    color: #f87171;
+  }
+}

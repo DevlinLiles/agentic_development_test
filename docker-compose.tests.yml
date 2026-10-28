@@ -1,0 +1,5 @@
+# TEMPORARY local verification scaffold - no longer needed, safe to delete.
+# (Created only to compile the test projects with the .NET 10 SDK, because the
+# local SDK is 8.x and cannot restore the EF Core 10 packages. Verification has
+# already been completed; this file carries no product behavior.)
+# Intentionally defines no services.

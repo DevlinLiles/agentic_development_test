@@ -100,6 +100,68 @@ public sealed class GerasimleoChessRulesEngineAdapter : IChessRulesEngine
         return destinationRank is '8' or '1';
     }
 
+    public IReadOnlyList<RulesLegalMove> GetAllLegalMoves(string fen, PlayerColor sideToMove)
+    {
+        // The from/to pairs come straight from the library's own move generation, exactly as
+        // GetLegalDestinations does, so the two methods can never disagree about what is legal.
+        if (!TryGetEngineMoves(fen, sideToMove, out var moves))
+        {
+            return Array.Empty<RulesLegalMove>();
+        }
+
+        var candidates = moves
+            .Select(m => (From: m.OriginalPosition.ToString(), To: m.NewPosition.ToString()))
+            // The library can emit one entry per promotion piece for a single from/to pair, while
+            // promotion-piece choice is deferred to TryApplyMove by contract, so collapse to one
+            // entry per from/to pair.
+            .DistinctBy(pair => (pair.From.ToUpperInvariant(), pair.To.ToUpperInvariant()))
+            .ToList();
+
+        // SAN and the terminal-state flags are only knowable once a move has actually been played,
+        // so every candidate is replayed through the existing apply path on a throw-away copy of
+        // the position. That keeps a single source of truth for SAN/flag computation (the
+        // enumeration is consistent with TryApplyMove by construction) and leaves the input
+        // position untouched, preserving the stateless FEN-in/FEN-out contract.
+        var result = new List<RulesLegalMove>(candidates.Count);
+        foreach (var (from, to) in candidates)
+        {
+            var played = TryApplyMove(fen, sideToMove, from, to, promotion: null);
+
+            result.Add(new RulesLegalMove
+            {
+                FromSquare = from,
+                ToSquare = to,
+                San = played.San ?? string.Empty,
+                IsCheck = played.IsCheck,
+                IsCheckmate = played.IsCheckmate,
+                IsStalemate = played.IsStalemate,
+                IsFiftyMoveDraw = played.IsFiftyMoveDraw,
+            });
+        }
+
+        return result;
+    }
+
+    private bool TryGetEngineMoves(string fen, PlayerColor sideToMove, out IEnumerable<EngineMove> moves)
+    {
+        if (!ChessBoard.TryLoadFromFen(fen, out var board, EnabledDrawRules))
+        {
+            moves = Enumerable.Empty<EngineMove>();
+            return false;
+        }
+
+        // A side that is not to move in the given position simply has no legal moves; like an
+        // unparseable FEN, that is reported as an empty enumeration rather than by throwing.
+        if (board.Turn != ToEngineColor(sideToMove))
+        {
+            moves = Enumerable.Empty<EngineMove>();
+            return false;
+        }
+
+        moves = board.Moves();
+        return true;
+    }
+
     private static PieceColor ToEngineColor(PlayerColor color) =>
         color == PlayerColor.White ? PieceColor.White : PieceColor.Black;
 

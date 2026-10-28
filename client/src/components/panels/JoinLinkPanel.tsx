@@ -9,6 +9,14 @@ export interface JoinLinkPanelProps {
 export function JoinLinkPanel({ gameState }: JoinLinkPanelProps) {
   const [copied, setCopied] = useState(false);
 
+  // AI games have no joinable second seat — the computer occupies Black from
+  // creation. The status guard below already covers this (AI games are Active
+  // at creation, never WaitingForPlayer2), but the explicit check keeps the
+  // panel off for any AI game regardless of how its status field evolves.
+  if (gameState.opponentType === "Computer") {
+    return null;
+  }
+
   if (gameState.status !== "WaitingForPlayer2" || gameState.yourColor !== "White") {
     return null;
   }

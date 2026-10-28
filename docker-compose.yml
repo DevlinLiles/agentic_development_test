@@ -11,11 +11,68 @@ services:
     volumes:
       - chessmvp-sqldata:/var/opt/mssql
     healthcheck:
+      # Deliberately generous: SQL Server's first-boot system-database upgrade
+      # routinely takes minutes, and once a HEALTHCHECK exhausts its retries and
+      # settles on `unhealthy` that is treated as a confirmed failure and never
+      # retried downstream. A check that passes early costs nothing.
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1"]
-      interval: 10s
-      timeout: 5s
+      interval: 15s
+      timeout: 10s
+      retries: 25
+      start_period: 180s
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: chessmvp-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5112
+      ConnectionStrings__ChessMvpDb: "Server=sqlserver,1433;Database=ChessMvp;User Id=sa;Password=ChessMvp!Local2026;TrustServerCertificate=True"
+      Cors__ClientOrigin: "http://localhost:5173"
+      # Retries EF migrations with backoff for up to ~5 minutes so a cold start
+      # survives SQL Server's post-"healthy" setup window instead of crashing.
+      Database__MigrateRetryAttempts: "60"
+    ports:
+      - "5112:5112"
+    depends_on:
+      # Bare `depends_on: [sqlserver]` only waits for container start, not readiness.
+      sqlserver:
+        condition: service_healthy
+    healthcheck:
+      # curl is installed in the runtime image (the Debian-slim base ships neither
+      # curl nor wget). ASPNETCORE_URLS binds http://+:5112, so the check targets
+      # 127.0.0.1:5112 — same interface/port the app actually listens on.
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5112/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 25
+      start_period: 180s
+
+  client:
+    build:
+      context: .
+      dockerfile: docker/client.Dockerfile
+      args:
+        # Baked into the Vite bundle at build time — must be the browser-visible host
+        # URLs, not the in-compose service names.
+        VITE_API_BASE_URL: http://localhost:5112
+        VITE_HUB_URL: http://localhost:5112/hubs/game
+    container_name: chessmvp-client
+    ports:
+      - "5173:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # nginx:alpine ships busybox wget but no curl. nginx.conf listens on plain port
+      # 80 (IPv4 0.0.0.0), so the IPv4 loopback target matches the bind exactly.
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:80/ || exit 1"]
+      interval: 15s
+      timeout: 10s
       retries: 10
-      start_period: 20s
+      start_period: 30s
 
 volumes:
   chessmvp-sqldata:

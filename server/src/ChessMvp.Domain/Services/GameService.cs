@@ -17,7 +17,7 @@ public sealed class GameService : IGameService
         _notifier = notifier;
     }
 
-    public async Task<Game> CreateGameAsync()
+    public async Task<Game> CreateGameAsync(OpponentMode opponentMode = OpponentMode.Human)
     {
         var now = DateTime.UtcNow;
         var game = new Game
@@ -25,6 +25,7 @@ public sealed class GameService : IGameService
             Id = Guid.NewGuid(),
             WhiteSlotToken = Guid.NewGuid(),
             BlackSlotToken = null,
+            OpponentMode = OpponentMode.Human,
             CurrentFen = ChessConstants.StartingFen,
             Turn = PlayerColor.White,
             Status = GameStatus.WaitingForPlayer2,
@@ -32,6 +33,23 @@ public sealed class GameService : IGameService
             CreatedUtc = now,
             UpdatedUtc = now,
         };
+
+        // Only the Computer discriminator selects this branch; every other value (the Human
+        // default, a legacy null, or an undefined enum cast) keeps the statement-for-statement
+        // two-player setup above, so the parameterless/defaulted call behaves exactly as it
+        // did before the parameter existed.
+        if (opponentMode == OpponentMode.Computer)
+        {
+            // A computer game has both seats filled the instant it exists: the human caller
+            // keeps White (the seat minted above) and the server-side AI takes Black. The AI
+            // seat gets its own slot token at creation so the engine submits its replies
+            // through the same token-resolution path a human player would, and the seat is
+            // never open to a join. Both seats being occupied also means the game skips
+            // WaitingForPlayer2 entirely and is immediately playable.
+            game.BlackSlotToken = Guid.NewGuid();
+            game.OpponentMode = OpponentMode.Computer;
+            game.Status = GameStatus.Active;
+        }
 
         await _repository.AddAsync(game);
         await _repository.SaveChangesAsync();
@@ -42,6 +60,18 @@ public sealed class GameService : IGameService
     public async Task<Game> JoinGameAsync(Guid gameId)
     {
         var game = await _repository.GetByIdAsync(gameId) ?? throw new GameNotFoundException(gameId);
+
+        // A computer game's Black seat belongs to the server-side AI from the moment of
+        // creation, so it is never joinable. This deliberately reuses the existing
+        // "not accepting joins" vocabulary rather than introducing a new exception type, so
+        // the API keeps answering 409 GameNotActive for it. The generic guard below would
+        // already reject these games (their Black slot token is minted at creation and their
+        // status is Active, not WaitingForPlayer2), but checking the discriminator makes the
+        // intent explicit and keeps the guarantee if either of those invariants ever shifts.
+        if ((game.OpponentMode ?? OpponentMode.Human) == OpponentMode.Computer)
+        {
+            throw new GameNotActiveException("This game is against the computer and cannot be joined by another player.");
+        }
 
         if (game.BlackSlotToken is not null || game.Status != GameStatus.WaitingForPlayer2)
         {

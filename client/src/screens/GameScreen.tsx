@@ -51,8 +51,13 @@ export function GameScreen() {
 
         // AI games are Active at creation and their second seat can never be
         // joined, so an un-seated visitor is never a spectator-in-waiting —
-        // they land in the not-a-participant message below.
-        if (state.status !== "WaitingForPlayer2") {
+        // they land in the not-a-participant message below. The opponentType
+        // check mirrors the same guard in JoinLinkPanel: even if an AI game's
+        // status field ever reads WaitingForPlayer2 (legacy data, a future
+        // "AI warm-up" state), joining is still impossible — the engine owns
+        // Black — so we never attempt it and never surface the resulting
+        // join rejection as a raw load error.
+        if (state.status !== "WaitingForPlayer2" || state.opponentType === "Computer") {
           setNotParticipant(true);
           setGameState(state);
           return;

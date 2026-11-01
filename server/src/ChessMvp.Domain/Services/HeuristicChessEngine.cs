@@ -191,9 +191,8 @@ public sealed class HeuristicChessEngine : IHeuristicChessEngine
     /// </summary>
     private MoveApplicationResult ApplyCandidate(string fen, PlayerColor sideToMove, RulesLegalMove candidate)
     {
-        // Declared as the explicit nullable type rather than `var`: a target-typed conditional
-        // needs a target type, and with `var` there is none, so "PromotionPieceType.Queen vs
-        // null" has no natural type (CS0173).
+        // Declared as PromotionPieceType? (not `var`) so the conditional below is target-typed:
+        // `var` cannot infer a type for "Queen or null" (CS0173).
         PromotionPieceType? promotion = _rulesEngine.IsPromotionMove(fen, candidate.FromSquare, candidate.ToSquare)
             ? PromotionPieceType.Queen
             : null;

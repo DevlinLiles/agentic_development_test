@@ -158,6 +158,10 @@ public sealed class GameService : IGameService
     /// move (FR-5).
     /// </summary>
     /// <remarks>
+    /// Pure move-within-method extraction: this body is statement-for-statement the ply logic
+    /// that previously ran inline in SubmitMoveAsync, so Human games behave exactly as before,
+    /// including legacy rows whose OpponentMode is NULL (read as Human). ApplyMove never
+    /// inspects OpponentMode — opponent-mode orchestration stays entirely with the caller.
     /// Deliberately persists nothing: the caller batches every ply of one submission into a
     /// single SaveChangesAsync so an AI-reply failure cannot leave a half-applied game.
     /// </remarks>

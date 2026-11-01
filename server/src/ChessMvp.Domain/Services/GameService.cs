@@ -9,12 +9,20 @@ public sealed class GameService : IGameService
     private readonly IGameRepository _repository;
     private readonly IChessRulesEngine _rulesEngine;
     private readonly IGameNotifier? _notifier;
+    private readonly IHeuristicChessEngine? _aiEngine;
 
-    public GameService(IGameRepository repository, IChessRulesEngine rulesEngine, IGameNotifier? notifier = null)
+    // notifier/aiEngine stay optional (null in unit tests) so existing test constructions keep
+    // compiling and behaving exactly as before; the composition root supplies both.
+    public GameService(
+        IGameRepository repository,
+        IChessRulesEngine rulesEngine,
+        IGameNotifier? notifier = null,
+        IHeuristicChessEngine? aiEngine = null)
     {
         _repository = repository;
         _rulesEngine = rulesEngine;
         _notifier = notifier;
+        _aiEngine = aiEngine;
     }
 
     public async Task<Game> CreateGameAsync(OpponentMode opponentMode = OpponentMode.Human)
@@ -104,6 +112,62 @@ public sealed class GameService : IGameService
     {
         var game = await _repository.GetByIdWithMovesAsync(gameId) ?? throw new GameNotFoundException(gameId);
 
+        ApplyMove(game, slotToken, fromSquare, toSquare, promotion);
+
+        var isComputerGame = (game.OpponentMode ?? OpponentMode.Human) == OpponentMode.Computer;
+
+        // FR-1: in a computer game, exactly one Black reply is generated and applied inside
+        // this same call (NFR-4), so the submission response already reflects both plies
+        // (FR-6) and no "Active + Black to move" state can persist past the request.
+        if (isComputerGame
+            && game.Status == GameStatus.Active
+            && game.Turn == PlayerColor.Black
+            && _aiEngine is not null)
+        {
+            var selection = _aiEngine.SelectMove(game.CurrentFen, PlayerColor.Black);
+
+            // FR-2: with no legal Black moves the game-end machinery owns the position; the AI
+            // takes no action. SelectMove never fabricates a move, so a returned selection is
+            // legal for this position by construction and, the board having two kings on it
+            // (see ApplyMove's check), never one of our own pieces.
+            if (selection is not null)
+            {
+                ApplyMove(game, game.BlackSlotToken!.Value, selection.FromSquare, selection.ToSquare, selection.PromotionPiece);
+            }
+        }
+
+        // Both plies persist atomically with one save (Q-1, option 2): if the AI step throws,
+        // nothing is written, the optimistic Version stamp never moves, and the client can
+        // simply retry the identical move.
+        await _repository.SaveChangesAsync();
+
+        // AC-10: one full-snapshot push covers both plies. A connected client replaces state
+        // wholesale, so a single broadcast is indistinguishable from two.
+        if (_notifier is not null)
+        {
+            await _notifier.NotifyGameUpdatedAsync(game);
+        }
+
+        return game;
+    }
+
+    /// <summary>
+    /// Validates and applies a single ply to the already-loaded <paramref name="game"/>: rules
+    /// validation, move entity, turn, FEN, halfmove clock and the game-end transitions. This is
+    /// the one code path for move application — the AI's reply rides it exactly like a human
+    /// move (FR-5).
+    /// </summary>
+    /// <remarks>
+    /// Deliberately persists nothing: the caller batches every ply of one submission into a
+    /// single SaveChangesAsync so an AI-reply failure cannot leave a half-applied game.
+    /// </remarks>
+    private void ApplyMove(
+        Game game,
+        Guid slotToken,
+        string fromSquare,
+        string toSquare,
+        PromotionPieceType? promotion)
+    {
         var resolvedColor = ResolveSlotToken(game, slotToken);
 
         if (game.Status != GameStatus.Active)
@@ -169,15 +233,6 @@ public sealed class GameService : IGameService
             game.Result = GameResult.Draw;
             game.ResultReason = GameResultReason.FiftyMoveRule;
         }
-
-        await _repository.SaveChangesAsync();
-
-        if (_notifier is not null)
-        {
-            await _notifier.NotifyGameUpdatedAsync(game);
-        }
-
-        return game;
     }
 
     public async Task<IReadOnlyList<Move>> GetMoveHistoryAsync(Guid gameId)

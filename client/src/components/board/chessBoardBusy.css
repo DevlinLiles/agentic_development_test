@@ -1,0 +1,15 @@
+/* Busy status shown while a move submission (including the computer's reply,
+   which the server computes synchronously) is in flight. Text, not just the
+   dimmed board: a ~2s thinking window needs a visible, announced signal. */
+.chess-board__busy {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+@media (prefers-color-scheme: dark) {
+  .chess-board__busy {
+    color: var(--text-h);
+  }
+}

@@ -10,6 +10,15 @@
 //   wired via aria-describedby.
 // - Colors come from the app's CSS custom properties so both light and dark
 //   schemes render correctly.
+// - The radios are never natively `disabled` while a create request is in
+//   flight (UX verification finding A-6): a disabled fieldset silently drops
+//   focus to <body> if focus is inside it. Interaction is guarded in
+//   onChange instead, so the radios keep their tab stops and focus stays
+//   put.
+// - The selected option's state is also exposed programmatically via
+//   aria-checked semantics (native radios do this), plus a visually-hidden
+//   selected flag in the option's hint for screen-reader parity with the
+//   visual highlight.
 
 import type { OpponentKind } from "../../types/gameTypes";
 import "./opponentChooser.css";
@@ -19,7 +28,10 @@ export interface OpponentChooserProps {
   value: OpponentKind;
   /** Fired when the user switches modes. */
   onChange: (value: OpponentKind) => void;
-  /** Disables the whole group (e.g. while a create request is in flight). */
+  /**
+   * Blocks interaction (e.g. while a create request is in flight) without
+   * natively disabling the controls, which would drop focus (A-6).
+   */
   disabled?: boolean;
   /** Prefix for element ids — set when more than one chooser can be on a page. */
   idPrefix?: string;
@@ -49,18 +61,23 @@ export function OpponentChooser({
   idPrefix = "opponent-chooser",
 }: OpponentChooserProps) {
   return (
-    <fieldset className="opponent-chooser" disabled={disabled}>
+    <fieldset
+      className="opponent-chooser"
+      aria-disabled={disabled || undefined}
+    >
       <legend className="opponent-chooser__legend">Opponent</legend>
       <div className="opponent-chooser__options">
         {OPTIONS.map((option) => {
           const inputId = `${idPrefix}-${option.kind.toLowerCase()}`;
           const hintId = `${inputId}-hint`;
+          const selected = value === option.kind;
           return (
             <div
               key={option.kind}
               className={
                 "opponent-chooser__option" +
-                (value === option.kind ? " opponent-chooser__option--selected" : "")
+                (selected ? " opponent-chooser__option--selected" : "") +
+                (disabled ? " opponent-chooser__option--disabled" : "")
               }
             >
               <input
@@ -68,8 +85,12 @@ export function OpponentChooser({
                 type="radio"
                 name={`${idPrefix}-kind`}
                 value={option.kind}
-                checked={value === option.kind}
-                onChange={() => onChange(option.kind)}
+                checked={selected}
+                onChange={() => {
+                  // Guarded rather than natively disabled so focus is never
+                  // dropped mid-interaction (A-6).
+                  if (!disabled) onChange(option.kind);
+                }}
                 aria-describedby={hintId}
               />
               <label htmlFor={inputId} className="opponent-chooser__option-label">

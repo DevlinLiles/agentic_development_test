@@ -29,6 +29,12 @@ RUN dotnet build server/tests/ChessMvp.Domain.Tests/ChessMvp.Domain.Tests.csproj
 # Infrastructure DI registrations, so it needs no database or hub — unlike Api.Tests, whose
 # Testcontainers/MsSql fixtures require a Docker daemon a build container does not have, and
 # which therefore stops at the compile gate above.
+#
+# The detailed console logger lists every executed test by name so the build log doubles as
+# the full-suite regression evidence: which pre-existing GameServiceTests facts ran, and that
+# the new Computer-game flow / terminal-state / promotion / Human-mode isolation suites were
+# included in the very same run. A failing test still fails this layer (exit code propagates).
 FROM build AS unittests
 RUN dotnet test server/tests/ChessMvp.Domain.Tests/ChessMvp.Domain.Tests.csproj \
-        -c Release --no-restore --no-build
+        -c Release --no-restore --no-build \
+        --logger "console;verbosity=detailed"

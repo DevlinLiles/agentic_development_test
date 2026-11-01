@@ -15,18 +15,25 @@ public class GameServiceTests
     private readonly IGameRepository _repository = Substitute.For<IGameRepository>();
     private readonly IChessRulesEngine _rulesEngine = Substitute.For<IChessRulesEngine>();
     private readonly IGameNotifier _notifier = Substitute.For<IGameNotifier>();
+
+    // The AI seam GameService resolves by constructor injection. It is substituted into the
+    // default SUT so every test runs with an AI available: the Human-path regressions below
+    // then prove the mode guard (not a missing dependency) is what keeps the reply branch off.
+    private readonly IChessAi _chessAi = Substitute.For<IChessAi>();
+
     private readonly GameService _sut;
 
     public GameServiceTests()
     {
-        _sut = new GameService(_repository, _rulesEngine, _notifier);
+        _sut = new GameService(_repository, _rulesEngine, _notifier, _chessAi);
     }
 
-    private static Game NewActiveGame(Guid? id = null) => new()
+    private static Game NewActiveGame(OpponentMode? opponentMode = OpponentMode.Human) => new()
     {
-        Id = id ?? Guid.NewGuid(),
+        Id = Guid.NewGuid(),
         WhiteSlotToken = WhiteToken,
         BlackSlotToken = BlackToken,
+        OpponentMode = opponentMode,
         CurrentFen = ChessConstants.StartingFen,
         Turn = PlayerColor.White,
         Status = GameStatus.Active,
@@ -65,6 +72,22 @@ public class GameServiceTests
         CreatedUtc = DateTime.UtcNow,
         UpdatedUtc = DateTime.UtcNow,
     };
+
+    /// <summary>
+    /// A deterministic notifier that records the game state at the moment of each broadcast.
+    /// Used where the assertion is about <em>when</em> and <em>how often</em> the notification
+    /// fires, which a substitute's call log can only answer indirectly.
+    /// </summary>
+    private sealed class RecordingNotifier : IGameNotifier
+    {
+        public List<(PlayerColor Turn, string CurrentFen, int MoveCount)> Calls { get; } = new();
+
+        public Task NotifyGameUpdatedAsync(Game game)
+        {
+            Calls.Add((game.Turn, game.CurrentFen, game.Moves.Count));
+            return Task.CompletedTask;
+        }
+    }
 
     [Fact]
     public async Task CreateGameAsync_ReturnsWaitingGameWithWhiteToken()
@@ -466,6 +489,303 @@ public class GameServiceTests
         Assert.Equal(GameResult.Draw, updated.Result);
         Assert.Equal(GameResultReason.FiftyMoveRule, updated.ResultReason);
         Assert.Equal(100, updated.HalfmoveClock);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Computer-game AI reply branch (ADR-0084 synchronous in-service trigger)
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Wires a Computer game so the human White move e2-e4 is legal, and the scripted AI reply
+    /// e7-e5 is legal for the position that move leaves. Both plies' rules-engine results are
+    /// mocked, so the tests observe the orchestration (order, counts, returned state) rather
+    /// than re-testing the rules engine.
+    /// </summary>
+    private (Game Game, string AfterHumanFen, string AfterReplyFen) SetupComputerGameWithReply()
+    {
+        var game = NewComputerGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string afterHumanFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+        const string afterReplyFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3";
+
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e4",
+                ResultingFen = afterHumanFen,
+            });
+
+        _chessAi.ChooseMove(afterHumanFen, PlayerColor.Black)
+            .Returns(new ChosenMove { FromSquare = "e7", ToSquare = "e5" });
+
+        _rulesEngine.TryApplyMove(afterHumanFen, PlayerColor.Black, "e7", "e5", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e5",
+                ResultingFen = afterReplyFen,
+            });
+
+        return (game, afterHumanFen, afterReplyFen);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_ComputerGame_TriggersSynchronousAiReplyAfterHumanMove()
+    {
+        var (game, afterHumanFen, afterReplyFen) = SetupComputerGameWithReply();
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        // The AI is consulted exactly once, and only after the human move has been applied:
+        // the position it is handed is the one the human ply produced, and it is asked for
+        // Black — never for the human's own colour.
+        _chessAi.Received(1).ChooseMove(afterHumanFen, PlayerColor.Black);
+        _chessAi.DidNotReceive().ChooseMove(Arg.Any<string>(), PlayerColor.White);
+
+        // The reply rides the same ApplyMove path a human move does: a second Move entity is
+        // recorded, numbered and coloured as Black's ply, and both plies land in the game.
+        Assert.Equal(2, updated.Moves.Count);
+        Assert.Equal(1, updated.Moves[0].MoveNumber);
+        Assert.Equal(PlayerColor.White, updated.Moves[0].PlyColor);
+        Assert.Equal("e4", updated.Moves[0].San);
+        Assert.Equal(2, updated.Moves[1].MoveNumber);
+        Assert.Equal(PlayerColor.Black, updated.Moves[1].PlyColor);
+        Assert.Equal("e7", updated.Moves[1].FromSquare);
+        Assert.Equal("e5", updated.Moves[1].ToSquare);
+        Assert.Equal("e5", updated.Moves[1].San);
+        Assert.Equal(afterReplyFen, updated.CurrentFen);
+
+        // The reply is applied through the rules engine for Black, from the AI's chosen
+        // squares — no other application of a Black ply can have happened.
+        _rulesEngine.Received(1).TryApplyMove(afterHumanFen, PlayerColor.Black, "e7", "e5", null);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_ComputerGame_ReturnsPostReplyStateWithSingleSave()
+    {
+        var (game, _, afterReplyFen) = SetupComputerGameWithReply();
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        // The response describes the game after the AI's reply, not after the human ply: it is
+        // White to move again, on the reply's FEN, with both plies already counted. No
+        // "Active + Black to move" state can persist past the request.
+        Assert.Same(game, updated);
+        Assert.Equal(afterReplyFen, updated.CurrentFen);
+        Assert.Equal(PlayerColor.White, updated.Turn);
+        Assert.Equal(GameStatus.Active, updated.Status);
+        Assert.Equal(2, updated.Moves.Count);
+
+        // Both plies of the turn persist atomically in a single save, so an AI-reply failure
+        // can never leave a half-applied game behind.
+        await _repository.Received(1).SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_ComputerGame_EmitsExactlyOneNotificationForTheWholeTurn()
+    {
+        var (game, _, afterReplyFen) = SetupComputerGameWithReply();
+        var notifier = new RecordingNotifier();
+        var sut = new GameService(_repository, _rulesEngine, notifier, _chessAi);
+
+        await sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        // Exactly one notification covers the combined human+AI turn — never one per ply — and
+        // it is emitted after the reply, so it already carries the post-reply state.
+        var notification = Assert.Single(notifier.Calls);
+        Assert.Equal(PlayerColor.White, notification.Turn);
+        Assert.Equal(afterReplyFen, notification.CurrentFen);
+        Assert.Equal(2, notification.MoveCount);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_ComputerGame_PromotionReply_PassesChosenPieceThrough()
+    {
+        // A ChosenMove is complete by contract: when the AI's reply promotes, the promotion
+        // piece it already decided on must reach the rules engine untouched rather than being
+        // re-chosen (or dropped) on the AI's behalf.
+        var game = NewComputerGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string afterHumanFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+        const string afterReplyFen = "rnbqkbn1/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3";
+
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e4",
+                ResultingFen = afterHumanFen,
+            });
+
+        _chessAi.ChooseMove(afterHumanFen, PlayerColor.Black)
+            .Returns(new ChosenMove
+            {
+                FromSquare = "a2",
+                ToSquare = "a1",
+                PromotionPiece = PromotionPieceType.Queen,
+            });
+
+        _rulesEngine.IsPromotionMove(afterHumanFen, "a2", "a1").Returns(true);
+        _rulesEngine.TryApplyMove(afterHumanFen, PlayerColor.Black, "a2", "a1", PromotionPieceType.Queen)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "a1=Q",
+                ResultingFen = afterReplyFen,
+            });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        _rulesEngine.Received(1)
+            .TryApplyMove(afterHumanFen, PlayerColor.Black, "a2", "a1", PromotionPieceType.Queen);
+        Assert.Equal(2, updated.Moves.Count);
+        Assert.Equal(PromotionPieceType.Queen, updated.Moves[1].PromotionPiece);
+        Assert.Equal(afterReplyFen, updated.CurrentFen);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_ComputerGame_AiHasNoLegalMove_AppliesNoReplyButStillSavesAndNotifiesOnce()
+    {
+        // ChooseMove answers null exactly when the side to move has no legal move; the reply
+        // branch must then apply nothing (terminal positions belong to the game-end machinery),
+        // while the submission itself still completes normally: one save, one notification, and
+        // a response describing the human ply.
+        var game = NewComputerGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string afterHumanFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e4",
+                ResultingFen = afterHumanFen,
+            });
+
+        _chessAi.ChooseMove(afterHumanFen, PlayerColor.Black).Returns((ChosenMove?)null);
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        Assert.Equal(afterHumanFen, updated.CurrentFen);
+        Assert.Equal(PlayerColor.Black, updated.Turn);
+        Assert.Single(updated.Moves);
+        _chessAi.Received(1).ChooseMove(afterHumanFen, PlayerColor.Black);
+        _rulesEngine.DidNotReceive().TryApplyMove(
+            Arg.Any<string>(), PlayerColor.Black, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<PromotionPieceType?>());
+        await _repository.Received(1).SaveChangesAsync();
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_ComputerGame_HumanMoveEndsGame_DoesNotConsultAi()
+    {
+        // The reply step is guarded on the game still being Active after the human ply: a move
+        // that finishes the game hands the position to the result machinery, not to the AI.
+        var game = NewComputerGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "f2", "f3", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "f3",
+                ResultingFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/5p2/PPPPP1PP/RNBQKBNR b KQkq - 0 2",
+                IsCheckmate = true,
+            });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "f2", "f3", null);
+
+        Assert.Equal(GameStatus.Ended, updated.Status);
+        Assert.Equal(GameResult.WhiteWins, updated.Result);
+        Assert.Single(updated.Moves);
+        _chessAi.DidNotReceive().ChooseMove(Arg.Any<string>(), Arg.Any<PlayerColor>());
+        await _repository.Received(1).SaveChangesAsync();
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
+    }
+
+    [Fact]
+    public async Task SubmitMoveAsync_ComputerGame_AiReplyDeliversCheckmate_EndsGameWithCorrectResult()
+    {
+        // The AI's reply rides the same game-end transitions as a human move, so a mating reply
+        // ends the game with Black winning — and the reply branch does not fire again, because
+        // the game is no longer Active.
+        var game = NewComputerGame();
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string afterHumanFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e4",
+                ResultingFen = afterHumanFen,
+            });
+
+        _chessAi.ChooseMove(afterHumanFen, PlayerColor.Black)
+            .Returns(new ChosenMove { FromSquare = "d8", ToSquare = "h4" });
+
+        _rulesEngine.TryApplyMove(afterHumanFen, PlayerColor.Black, "d8", "h4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "Qh4#",
+                ResultingFen = "rnb1kbnr/pppp1ppp/8/4p3/4P3/7q/PPPP1PPP/RNBQKBNR w KQkq - 0 3",
+                IsCheck = true,
+                IsCheckmate = true,
+            });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        Assert.Equal(GameStatus.Ended, updated.Status);
+        Assert.Equal(GameResult.BlackWins, updated.Result);
+        Assert.Equal(GameResultReason.Checkmate, updated.ResultReason);
+        Assert.Equal(2, updated.Moves.Count);
+        Assert.True(updated.Moves[1].IsCheckmate);
+
+        // Exactly one consultation for the whole turn — the ended game is not fed back to the AI.
+        _chessAi.Received(1).ChooseMove(Arg.Any<string>(), Arg.Any<PlayerColor>());
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
+    }
+
+    [Theory]
+    [InlineData(OpponentMode.Human)]
+    [InlineData(null)]
+    public async Task SubmitMoveAsync_HumanAndLegacyNullOpponentMode_DoNotTriggerAiReply(OpponentMode? opponentMode)
+    {
+        // The reply branch is selected by the Computer discriminator alone. An explicit Human
+        // row — and a legacy NULL row, normalized to Human — must keep the pure two-player
+        // flow even though an AI is available: one ply, one save, one notification, and the AI
+        // is never asked for a move.
+        var game = NewActiveGame(opponentMode);
+        _repository.GetByIdWithMovesAsync(game.Id).Returns(game);
+
+        const string resultingFen = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2";
+        _rulesEngine.TryApplyMove(game.CurrentFen, PlayerColor.White, "e2", "e4", null)
+            .Returns(new MoveApplicationResult
+            {
+                IsLegal = true,
+                San = "e4",
+                ResultingFen = resultingFen,
+            });
+
+        var updated = await _sut.SubmitMoveAsync(game.Id, WhiteToken, "e2", "e4", null);
+
+        // Zero behavioural change for non-Computer games: the response describes the single
+        // submitted ply and it is now the opponent's move.
+        Assert.Same(game, updated);
+        Assert.Equal(resultingFen, updated.CurrentFen);
+        Assert.Equal(PlayerColor.Black, updated.Turn);
+        Assert.Single(updated.Moves);
+        Assert.Equal(OpponentMode.Human, updated.OpponentMode ?? OpponentMode.Human);
+
+        _chessAi.DidNotReceive().ChooseMove(Arg.Any<string>(), Arg.Any<PlayerColor>());
+        _rulesEngine.DidNotReceive().TryApplyMove(
+            Arg.Any<string>(), PlayerColor.Black, Arg.Any<string>(), Arg.Any<string>(), Arg.Any<PromotionPieceType?>());
+        await _repository.Received(1).SaveChangesAsync();
+        await _notifier.Received(1).NotifyGameUpdatedAsync(game);
     }
 
     [Fact]

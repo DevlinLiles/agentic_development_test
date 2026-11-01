@@ -1,5 +1,9 @@
 using ChessMvp.Domain.Abstractions;
 using ChessMvp.Domain.Services;
+using ChessMvp.Infrastructure.ChessRulesEngine;
+using ChessMvp.Infrastructure.Persistence;
+using ChessMvp.Infrastructure.Persistence.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,17 +19,15 @@ public static class DependencyInjection
         // but are wired here, beside the rules-engine adapter they consume, so all chess-domain
         // services are registered by one composition call. Both are registered as singletons
         // with the singleton rules engine: each is stateless and side-effect free by contract,
-        // and the AI reply is computed synchronously inside SubmitMoveAsync.
+        // and the AI reply is computed synchronously inside SubmitMoveAsync (ADR-0084).
         services.AddSingleton<IChessRulesEngine, GerasimleoChessRulesEngineAdapter>();
 
-        // The pre-existing seam, still consumed by GameService's computer-mode reply step.
-        services.AddSingleton<IHeuristicChessEngine, HeuristicChessEngine>();
-
-        // The strength-agnostic seam: exposes only a chosen move, so consumers never see the
-        // heuristics and a future minimax implementation can replace this registration alone.
+        // The strength-agnostic seam consumed by GameService's computer-mode reply step: it
+        // exposes only a chosen move, so consumers never see the heuristics and a future
+        // minimax implementation can replace this registration alone.
         services.AddSingleton<IChessAi, HeuristicChessAi>();
 
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        var connectionString = configuration.GetConnectionString("ChessMvpDb");
         services.AddDbContext<ChessDbContext>(options =>
             options.UseSqlServer(connectionString));
 

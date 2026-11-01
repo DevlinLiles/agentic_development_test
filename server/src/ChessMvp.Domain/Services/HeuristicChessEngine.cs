@@ -191,7 +191,9 @@ public sealed class HeuristicChessEngine : IHeuristicChessEngine
     /// </summary>
     private MoveApplicationResult ApplyCandidate(string fen, PlayerColor sideToMove, RulesLegalMove candidate)
     {
-        var promotion = _rulesEngine.IsPromotionMove(fen, candidate.FromSquare, candidate.ToSquare)
+        // The explicit PromotionPieceType? annotation supplies the target type the conditional
+        // needs: `var` would leave it with no implicit conversion between the enum and null.
+        PromotionPieceType? promotion = _rulesEngine.IsPromotionMove(fen, candidate.FromSquare, candidate.ToSquare)
             ? PromotionPieceType.Queen
             : null;
 

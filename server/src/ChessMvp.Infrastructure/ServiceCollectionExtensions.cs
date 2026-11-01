@@ -1,25 +1,5 @@
-using ChessMvp.Domain.Abstractions;
-using ChessMvp.Infrastructure.ChessRulesEngine;
-using ChessMvp.Infrastructure.Persistence;
-using ChessMvp.Infrastructure.Persistence.Repositories;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-
-namespace ChessMvp.Infrastructure;
-
-public static class ServiceCollectionExtensions
-{
-    public static IServiceCollection AddChessInfrastructure(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-        services.AddDbContext<ChessDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("ChessMvpDb")));
-
-        services.AddScoped<IGameRepository, GameRepository>();
-        services.AddSingleton<IChessRulesEngine, GerasimleoChessRulesEngineAdapter>();
-
-        return services;
-    }
-}
+// Removed: this class carried a duplicate `AddChessInfrastructure` extension method that
+// collided (CS0121 ambiguous call) with the real composition root in DependencyInjection.cs
+// for every caller. The only live call site (ChessMvp.Api/Program.cs) already resolves
+// DependencyInjection.AddChessInfrastructure, so the file is deleted rather than kept as an
+// alias. Kept as an empty placeholder via this explanatory comment; no code is defined here.

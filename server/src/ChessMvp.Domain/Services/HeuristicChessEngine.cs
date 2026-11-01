@@ -191,7 +191,9 @@ public sealed class HeuristicChessEngine : IHeuristicChessEngine
     /// </summary>
     private MoveApplicationResult ApplyCandidate(string fen, PlayerColor sideToMove, RulesLegalMove candidate)
     {
-        var promotion = _rulesEngine.IsPromotionMove(fen, candidate.FromSquare, candidate.ToSquare)
+        // Declared as PromotionPieceType? (not `var`) so the conditional below is target-typed:
+        // `var` cannot infer a type for "Queen or null" (CS0173).
+        PromotionPieceType? promotion = _rulesEngine.IsPromotionMove(fen, candidate.FromSquare, candidate.ToSquare)
             ? PromotionPieceType.Queen
             : null;
 

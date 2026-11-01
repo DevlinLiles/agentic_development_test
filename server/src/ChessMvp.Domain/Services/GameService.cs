@@ -9,20 +9,27 @@ public sealed class GameService : IGameService
     private readonly IGameRepository _repository;
     private readonly IChessRulesEngine _rulesEngine;
     private readonly IGameNotifier? _notifier;
-    private readonly IHeuristicChessEngine? _aiEngine;
 
-    // notifier/aiEngine stay optional (null in unit tests) so existing test constructions keep
-    // compiling and behaving exactly as before; the composition root supplies both.
+    /// <summary>
+    /// The strength-agnostic AI seam (ADR-0084). GameService asks it for Black's reply in a
+    /// Computer game and knows nothing about <em>how</em> the move was found — one-ply
+    /// heuristics and a full search are both just an <see cref="IChessAi"/> implementation.
+    /// </summary>
+    private readonly IChessAi? _chessAi;
+
+    // notifier/chessAi stay optional (null in unit tests that do not exercise them) so the
+    // pre-existing three-argument test constructions keep compiling and behaving exactly as
+    // before; the composition root supplies both.
     public GameService(
         IGameRepository repository,
         IChessRulesEngine rulesEngine,
         IGameNotifier? notifier = null,
-        IHeuristicChessEngine? aiEngine = null)
+        IChessAi? chessAi = null)
     {
         _repository = repository;
         _rulesEngine = rulesEngine;
         _notifier = notifier;
-        _aiEngine = aiEngine;
+        _chessAi = chessAi;
     }
 
     public async Task<Game> CreateGameAsync(OpponentMode opponentMode = OpponentMode.Human)
@@ -114,25 +121,33 @@ public sealed class GameService : IGameService
 
         ApplyMove(game, slotToken, fromSquare, toSquare, promotion);
 
+        // Only the Computer discriminator selects the reply branch; an explicit Human row — and
+        // a legacy NULL row, normalized to Human — keeps the pure two-player flow: one submitted
+        // ply, one save, one notification, and the response describes that ply alone.
         var isComputerGame = (game.OpponentMode ?? OpponentMode.Human) == OpponentMode.Computer;
 
-        // FR-1: in a computer game, exactly one Black reply is generated and applied inside
-        // this same call (NFR-4), so the submission response already reflects both plies
-        // (FR-6) and no "Active + Black to move" state can persist past the request.
+        // FR-1 / ADR-0084 synchronous in-service trigger: in a Computer game, exactly one Black
+        // reply is generated and applied inside this same call (NFR-4) — no out-of-band
+        // trigger, no queue, no second request — so the submission response already reflects
+        // both plies (FR-6) and no "Active + Black to move" state can persist past the request.
+        // The Active/Turn guards keep the step on the move that was just handed to the AI:
+        // a human move that ended the game, or one that left White to move, ends the turn here.
         if (isComputerGame
             && game.Status == GameStatus.Active
             && game.Turn == PlayerColor.Black
-            && _aiEngine is not null)
+            && _chessAi is not null)
         {
-            var selection = _aiEngine.SelectMove(game.CurrentFen, PlayerColor.Black);
+            var reply = _chessAi.ChooseMove(game.CurrentFen, PlayerColor.Black);
 
             // FR-2: with no legal Black moves the game-end machinery owns the position; the AI
-            // takes no action. SelectMove never fabricates a move, so a returned selection is
-            // legal for this position by construction and, the board having two kings on it
-            // (see ApplyMove's check), never one of our own pieces.
-            if (selection is not null)
+            // takes no action. ChooseMove never fabricates a move, so a returned reply is legal
+            // for this position by construction and, the board having two kings on it (see
+            // ApplyMove's check), never one of our own pieces.
+            if (reply is not null)
             {
-                ApplyMove(game, game.BlackSlotToken!.Value, selection.FromSquare, selection.ToSquare, selection.PromotionPiece);
+                // The reply rides the very same ApplyMove path a human move does (FR-5),
+                // including the AI seat's slot token minted at creation.
+                ApplyMove(game, game.BlackSlotToken!.Value, reply.FromSquare, reply.ToSquare, reply.PromotionPiece);
             }
         }
 
@@ -142,7 +157,8 @@ public sealed class GameService : IGameService
         await _repository.SaveChangesAsync();
 
         // AC-10: one full-snapshot push covers both plies. A connected client replaces state
-        // wholesale, so a single broadcast is indistinguishable from two.
+        // wholesale, so a single broadcast is indistinguishable from two — and emitting it
+        // after the reply (not between the plies) is what keeps it exactly one per submission.
         if (_notifier is not null)
         {
             await _notifier.NotifyGameUpdatedAsync(game);

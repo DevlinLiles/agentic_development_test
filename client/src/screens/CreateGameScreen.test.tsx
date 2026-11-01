@@ -1,11 +1,3 @@
-// Component tests for CreateGameScreen's opponent-mode selection.
-//
-// The screen renders the OpponentChooser radio group and forwards the picked
-// mode to gamesApi.createGame(). These tests pin the two behaviors the
-// acceptance criteria call out: the default selection is unchanged ("Human",
-// the pre-existing two-player flow) and switching modes changes what is
-// submitted on create.
-
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -137,16 +129,27 @@ describe("CreateGameScreen opponent-mode selection", () => {
     await user.click(screen.getByRole("radio", { name: "Play the computer" }));
     await user.click(screen.getByRole("button", { name: "Create Game" }));
 
-    // While the request is in flight: per-mode busy label, the radios are
-    // disabled (can't change mode mid-request) and no second submit fires —
-    // the button is aria-disabled and guarded, not unmounted.
+    // While the request is in flight: per-mode busy label, the mode is locked
+    // (can't change mode mid-request) and no second submit fires — the button
+    // and the chooser are aria-disabled and guarded, not unmounted or natively
+    // disabled (UX verification finding A-6: a natively disabled control would
+    // silently drop focus to <body>).
     expect(screen.getByRole("button", { name: "Starting game…" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Starting game…" })).toHaveAttribute(
       "aria-disabled",
       "true",
     );
+    const chooserFieldset = screen
+      .getByRole("radio", { name: "Play the computer" })
+      .closest("fieldset");
+    expect(chooserFieldset).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("radio", { name: "Play the computer" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Play the computer" })).toBeDisabled();
+
+    // A click on a radio is refused while the request is in flight: the mode
+    // the user picked stays selected even if they try to change it.
+    await user.click(screen.getByRole("radio", { name: "Play a friend" }));
+    expect(gamesApi.createGame).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("radio", { name: "Play the computer" })).toBeChecked();
 
     await user.click(screen.getByRole("button", { name: "Starting game…" }));
     expect(gamesApi.createGame).toHaveBeenCalledTimes(1);

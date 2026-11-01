@@ -1,5 +1,8 @@
+# VCS / CI metadata — never needed inside a build context.
 .git
 .github
+
+# Build outputs & dependencies (reinstalled/restored inside the images).
 **/node_modules
 **/bin
 **/obj
@@ -7,3 +10,17 @@ client/dist
 client/coverage
 client/test-results
 client/playwright-report
+
+# E2E specs & tooling config: not build inputs for the api or client images
+# (dotnet publish only consumes server/; vite build only consumes client/src).
+client/e2e
+client/playwright.config.ts
+client/.oxlintrc.json
+
+# Repo-level files neither Dockerfile COPYs — excluded to keep the build
+# context (and cache-invalidation surface) minimal.
+.editorconfig
+LICENSE
+README.md
+docker-compose.yml
+docker-compose.tests.yml

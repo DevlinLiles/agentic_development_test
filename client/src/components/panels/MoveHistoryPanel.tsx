@@ -38,7 +38,11 @@ export function MoveHistoryPanel({ gameId, token, refreshKey }: MoveHistoryPanel
   return (
     <div className="move-history-panel">
       <h3>Moves</h3>
-      {error && <p className="move-history-panel__error">{error}</p>}
+      {error && (
+        <p className="move-history-panel__error" role="alert">
+          {error}
+        </p>
+      )}
       {moves.length === 0 && !error ? (
         <p className="move-history-panel__empty">No moves yet</p>
       ) : (

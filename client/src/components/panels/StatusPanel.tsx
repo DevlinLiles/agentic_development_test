@@ -12,6 +12,9 @@
 //   that it's their move again. It only renders when the last move on the
 //   board was the computer's — in a computer game that is exactly when it's
 //   the human's turn.
+// - When the computer's reply ends the game, that reply is still announced
+//   (above the terminal banner) rather than being swallowed by it — see
+//   `computerDeliveredLastMove` below (UX verification finding A-2).
 // - The opponent is always named in text (never icon/color alone).
 
 import type { GameStateResponse } from "../../types/gameTypes";
@@ -43,13 +46,36 @@ function terminalMessage(gameState: GameStateResponse): string | null {
   }
 }
 
+/**
+ * Whether the computer's own move ended the game, and so deserves to be
+ * announced before the terminal banner.
+ *
+ * The wire's `lastMove` carries no color, so this is inferred from the
+ * outcome instead: the human always plays White in a computer game, so a
+ * Black win can only have been delivered by the computer's final move. Draws
+ * are deliberately not announced — the last mover there is genuinely
+ * ambiguous from the response alone, and guessing would sometimes attribute
+ * the human's move to the computer.
+ */
+function computerDeliveredLastMove(gameState: GameStateResponse): boolean {
+  return (
+    gameState.opponentType === "Computer" &&
+    gameState.result === "BlackWins" &&
+    gameState.lastMove !== null
+  );
+}
+
 export function StatusPanel({ gameState }: StatusPanelProps) {
   const { status, turn, yourColor, isCheck } = gameState;
 
   if (status === "Ended") {
     const message = terminalMessage(gameState);
+    const computerReply = computerDeliveredLastMove(gameState)
+      ? `Computer played ${gameState.lastMove!.san}`
+      : null;
     return (
       <div className="status-panel status-panel--ended" role="status">
+        {computerReply && <p className="status-panel__ai-reply">{computerReply}</p>}
         <p className="status-panel__banner">{message ?? "Game over"}</p>
         {gameState.opponentType === "Computer" && (
           <p className="status-panel__opponent">You played the computer</p>

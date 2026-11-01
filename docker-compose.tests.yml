@@ -1,5 +1,6 @@
 # TEMPORARY local verification scaffold - no longer needed, safe to delete.
-# (Created only to compile the test projects with the .NET 10 SDK, because the
-# local SDK is 8.x and cannot restore the EF Core 10 packages. Verification has
-# already been completed; this file carries no product behavior.)
-# Intentionally defines no services.
+# (Test compile/run verification now lives in docker/tests.Dockerfile, wired up as the
+#  `tests` service under the "verify" profile in docker-compose.override.yml. Because the
+#  override file is merged by plain `docker compose` automatically, it is reached without
+#  any -f flag: `docker compose build --no-cache tests`. This file intentionally defines
+#  no services.)

@@ -2,7 +2,15 @@
 //
 // These cover the accessibility-critical wiring the chooser relies on: the
 // native radio group semantics, label-click selection, the change callback
-// reporting the picked OpponentKind, and the disabled state blocking input.
+// reporting the picked OpponentKind, and the blocked state stopping input.
+//
+// Note on the blocked state: the chooser deliberately never natively
+// `disabled`s its radios (UX verification finding A-6 — a disabled fieldset
+// silently drops focus to <body> when focus is inside it). It exposes
+// aria-disabled on the fieldset instead and guards the change handler, so
+// the radios keep their tab stops while still refusing input. The tests
+// below pin exactly that contract: aria-disabled, still focusable, and no
+// onChange.
 
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -20,6 +28,11 @@ function renderChooser(overrides: { value?: OpponentKind; disabled?: boolean } =
     />,
   );
   return { onChange };
+}
+
+/** The chooser's fieldset — the element that carries the group's aria-disabled. */
+function chooserFieldset(): HTMLFieldSetElement {
+  return screen.getByRole("radio", { name: "Play a friend" }).closest("fieldset")!;
 }
 
 describe("OpponentChooser", () => {
@@ -94,14 +107,29 @@ describe("OpponentChooser", () => {
     expect(onChange).toHaveBeenCalledWith("Computer");
   });
 
-  it("does not fire onChange while the group is disabled", async () => {
+  it("does not fire onChange while the group is blocked", async () => {
     const { onChange } = renderChooser({ value: "Human", disabled: true });
 
-    expect(screen.getByRole("radio", { name: "Play a friend" })).toBeDisabled();
-    expect(screen.getByRole("radio", { name: "Play the computer" })).toBeDisabled();
+    // Blocked, not natively disabled (A-6): the fieldset announces
+    // aria-disabled so assistive tech reports the group as non-operable…
+    expect(chooserFieldset()).toHaveAttribute("aria-disabled", "true");
+    // …the radios are never removed from the tab order (a natively disabled
+    // fieldset would drop focus to <body>)…
+    expect(screen.getByRole("radio", { name: "Play a friend" })).not.toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Play the computer" })).not.toBeDisabled();
+    // …and interaction is refused by the guarded handler instead.
+    expect(onChange).not.toHaveBeenCalled();
 
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await user.click(screen.getByRole("radio", { name: "Play the computer" }));
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("does not announce aria-disabled when the group is operable", () => {
+    renderChooser();
+
+    // Only the blocked state sets the attribute — an idle chooser must not
+    // tell assistive tech it is disabled.
+    expect(chooserFieldset()).not.toHaveAttribute("aria-disabled");
   });
 });

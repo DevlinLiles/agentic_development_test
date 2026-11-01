@@ -58,11 +58,17 @@ function buildLayout(orientation: PlayerColor): BoardLayout {
   const files = orientation === "Black" ? ORIENTED_FILES_BLACK : ORIENTED_FILES;
   const ranks = orientation === "Black" ? ORIENTED_RANKS_BLACK : ORIENTED_RANKS_WHITE;
 
+  // `file` is the square's canonical index in a…h (0 = a … 7 = h), NOT its
+  // position in the visited row: the Black layout walks h…a, so the first
+  // cell of a Black row is file 7, not file 0. Both the index and the square
+  // name must therefore be derived from the *oriented* file name — deriving
+  // them from the loop index instead would emit the squares in a…h order and
+  // leave the Black board half-flipped (ranks mirrored, files not).
   const rows = ranks.map((rank) =>
-    files.map((_, fileIndex) => ({
-      file: fileIndex,
+    files.map((fileName) => ({
+      file: FILES.indexOf(fileName),
       rank,
-      square: `${FILES[fileIndex]}${rank}`,
+      square: `${fileName}${rank}`,
     })),
   );
 

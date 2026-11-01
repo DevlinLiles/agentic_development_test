@@ -23,21 +23,28 @@ export interface SquareProps {
  *
  * Forwarded refs keep the button focusable programmatically, which dialog
  * overlays (the promotion picker) need for focus management.
+ *
+ * The native `onClick` is omitted from the spread-in button attributes: this
+ * component owns the click contract (`(square: string) => void`) and adapts
+ * it to the DOM handler internally. Intersecting the two signatures would
+ * require a handler assignable to both, which no function can satisfy.
  */
-export const Square = forwardRef<HTMLButtonElement, SquareProps & ButtonHTMLAttributes<HTMLButtonElement>>(
-  function Square(
-    {
-      square,
-      piece,
-      isDarkSquare,
-      isSelected,
-      isLegalDestination,
-      isLastMoveSquare,
-      onClick,
-      ...rest
-    },
-    ref,
-  ) {
+export const Square = forwardRef<
+  HTMLButtonElement,
+  SquareProps & Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick">
+>(function Square(
+  {
+    square,
+    piece,
+    isDarkSquare,
+    isSelected,
+    isLegalDestination,
+    isLastMoveSquare,
+    onClick,
+    ...rest
+  },
+  ref,
+) {
     const classNames = [
       "chess-square",
       isDarkSquare ? "chess-square--dark" : "chess-square--light",

@@ -1,5 +1,9 @@
 using ChessMvp.Domain.Abstractions;
 using ChessMvp.Domain.Services;
+using ChessMvp.Infrastructure.ChessRulesEngine;
+using ChessMvp.Infrastructure.Persistence;
+using ChessMvp.Infrastructure.Persistence.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,7 +29,7 @@ public static class DependencyInjection
         // heuristics and a future minimax implementation can replace this registration alone.
         services.AddSingleton<IChessAi, HeuristicChessAi>();
 
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        var connectionString = configuration.GetConnectionString("ChessMvpDb");
         services.AddDbContext<ChessDbContext>(options =>
             options.UseSqlServer(connectionString));
 

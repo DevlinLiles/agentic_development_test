@@ -1,25 +1,8 @@
-using ChessMvp.Domain.Abstractions;
-using ChessMvp.Infrastructure.ChessRulesEngine;
-using ChessMvp.Infrastructure.Persistence;
-using ChessMvp.Infrastructure.Persistence.Repositories;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-
-namespace ChessMvp.Infrastructure;
-
-public static class ServiceCollectionExtensions
-{
-    public static IServiceCollection AddChessInfrastructure(
-        this IServiceCollection services,
-        IConfiguration configuration)
-    {
-        services.AddDbContext<ChessDbContext>(options =>
-            options.UseSqlServer(configuration.GetConnectionString("ChessMvpDb")));
-
-        services.AddScoped<IGameRepository, GameRepository>();
-        services.AddSingleton<IChessRulesEngine, GerasimleoChessRulesEngineAdapter>();
-
-        return services;
-    }
-}
+// Deleted in this QA change: this file declared a duplicate `AddChessInfrastructure`
+// extension method (identical namespace and signature) alongside the newer
+// DependencyInjection.cs, which made Program.cs's call ambiguous (CS0121) — the whole
+// ChessMvp.Api project failed to compile. Its registrations (DbContext with the
+// "ChessMvpDb" connection string, the game repository and the rules-engine adapter) are
+// fully subsumed by DependencyInjection.cs, so nothing is lost by removing the duplicate.
+// The file is left comment-only (deleting it outright is not possible with the available
+// tooling); a comment-only .cs file compiles to nothing and declares no types.

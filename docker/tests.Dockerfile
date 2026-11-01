@@ -22,6 +22,9 @@ COPY server/ server/
 RUN dotnet build server/tests/ChessMvp.Domain.Tests/ChessMvp.Domain.Tests.csproj -c Release --no-restore \
     && dotnet build server/tests/ChessMvp.Api.Tests/ChessMvp.Api.Tests.csproj -c Release --no-restore
 
-# Optional test execution: built with --target runtests (default target only compiles).
+# Optional test execution: built with --target runtests (the default `build` target only
+# compiles). Runs BOTH test projects — Domain.Tests first (fast, no containers), then
+# Api.Tests. `sh -c` is required to sequence two dotnet invocations; `--no-build` reuses the
+# compilation from the layer above, and a non-zero exit from either project fails the run.
 FROM build AS runtests
-ENTRYPOINT ["dotnet", "test", "server/tests/ChessMvp.Domain.Tests/ChessMvp.Domain.Tests.csproj", "-c", "Release", "--no-restore", "--no-build"]
+ENTRYPOINT ["sh", "-c", "dotnet test server/tests/ChessMvp.Domain.Tests/ChessMvp.Domain.Tests.csproj -c Release --no-restore --no-build && dotnet test server/tests/ChessMvp.Api.Tests/ChessMvp.Api.Tests.csproj -c Release --no-restore --no-build"]

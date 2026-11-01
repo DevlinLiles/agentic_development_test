@@ -1,4 +1,6 @@
 # TEMPORARY local verification scaffold - no longer needed, safe to delete.
-# (The `tests` verification service now lives in docker-compose.override.yml under the
-# "verify" profile, building docker/tests.Dockerfile, because the .NET 10 SDK is not
-# available locally. This file intentionally defines no services.)
+# (Test compile/run verification now lives in docker/tests.Dockerfile, wired up as the
+#  `tests` service under the "verify" profile in docker-compose.override.yml. Because the
+#  override file is merged by plain `docker compose` automatically, it is reached without
+#  any -f flag: `docker compose build --no-cache tests`. This file intentionally defines
+#  no services.)

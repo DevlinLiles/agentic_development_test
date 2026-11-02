@@ -10,9 +10,9 @@
 // installed, replace the import with `@storybook/react` — the story shapes
 // are CSF3-standard.
 
-import { describeApiError } from "../../utils/describeApiError";
-import { ApiError } from "../../api/httpClient";
-import type { StoryObj, Meta } from "../../storybook/stubs";
+import { describeApiError } from "./describeApiError";
+import { ApiError } from "../api/httpClient";
+import type { StoryObj, Meta } from "../storybook/stubs";
 
 interface ErrorCopyStoryArgs {
   context: "move" | "create" | "load";

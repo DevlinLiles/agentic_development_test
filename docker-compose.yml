@@ -74,5 +74,23 @@ services:
       retries: 10
       start_period: 30s
 
+  # Test-compile/run verification scaffold: restores, compiles, and (for the
+  # container-free Domain unit suite) executes the test projects under the .NET 10
+  # SDK, because the local SDK is 8.x and cannot restore the EF Core 10 packages.
+  # Lives in this file (not a separate override) so it is reachable by service name
+  # regardless of how compose is invoked — an explicit `docker compose -f docker-compose.yml`
+  # would silently drop an override-only service. The `verify` profile keeps it out of
+  # plain `docker compose up`/`docker compose build`, so normal API/client/SQL workflows
+  # are unaffected. Run with:
+  #   docker compose build tests
+  tests:
+    profiles:
+      - verify
+    build:
+      context: .
+      dockerfile: docker/tests.Dockerfile
+      target: unittests
+    container_name: chessmvp-tests
+
 volumes:
   chessmvp-sqldata:

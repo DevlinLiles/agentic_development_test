@@ -47,6 +47,18 @@ export function ChessBoard({ gameId, playerToken, yourColor, gameState, onStateU
       : "Sending your move…"
     : null;
 
+  // A finished game keeps its board visible for review, but no square is
+  // operable anymore: clicks are already a no-op (see `interactive`), and the
+  // `chess-board--ended` class removes the pointer affordance so the board
+  // doesn't keep looking playable after the result banner (finding V-8).
+  const boardClasses = [
+    "chess-board",
+    clickToMove.isAwaitingServer ? "chess-board--busy" : "",
+    gameState.status === "Ended" ? "chess-board--ended" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div className="chess-board-wrapper">
       {clickToMove.error && (
@@ -59,8 +71,9 @@ export function ChessBoard({ gameId, playerToken, yourColor, gameState, onStateU
       )}
 
       <div
-        className={`chess-board ${clickToMove.isAwaitingServer ? "chess-board--busy" : ""}`}
+        className={boardClasses}
         aria-busy={clickToMove.isAwaitingServer ? "true" : undefined}
+        aria-label={interactive ? "Chess board" : "Chess board (game over)"}
       >
         {layout.rows.map((row) =>
           row.map(({ square, file, rank }) => {

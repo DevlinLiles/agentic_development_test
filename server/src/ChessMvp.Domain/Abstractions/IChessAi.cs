@@ -25,23 +25,33 @@ namespace ChessMvp.Domain.Abstractions;
 /// <list type="bullet">
 /// <item>
 /// <term>Deterministic.</term>
-/// <description>The same <paramref name="fen"/> and <paramref name="sideToMove"/> always yield
-/// the same <see cref="ChosenMove"/>. Implementations must not consult the clock, randomness,
-/// thread scheduling or any mutable state, and must not depend on the order in which a rules
-/// engine enumerates moves.</description>
+/// <description>
+/// <see cref="ChooseMove"/> returns the same <see cref="ChosenMove"/> every time it is called
+/// with the same position and side to move. Implementations must not consult the clock,
+/// randomness, thread scheduling or any mutable state, and must not depend on the order in
+/// which a rules engine enumerates moves — so a test may permute the enumerated moves, repeat
+/// the call, or run it on another platform and still assert the identical answer.
+/// </description>
 /// </item>
 /// <item>
 /// <term>Total.</term>
-/// <description>A non-null result is returned for every position in which
-/// <paramref name="sideToMove"/> has at least one legal move, and <see langword="null"/>
-/// exactly when it has none — terminal-position handling is the caller's concern, the same
-/// fail-empty convention <see cref="IChessRulesEngine"/> follows.</description>
+/// <description>
+/// A non-null result is returned for every position in which the side to move has at least one
+/// legal move, and <see langword="null"/> exactly when it has none — terminal-position handling
+/// is the caller's concern, the same fail-empty convention
+/// <see cref="IChessRulesEngine.GetAllLegalMoves(string, Entities.PlayerColor)"/> follows, so
+/// a test can assert null on checkmate, stalemate and unparseable positions and non-null on
+/// every other one.
+/// </description>
 /// </item>
 /// <item>
 /// <term>Legal by construction.</term>
-/// <description>The chosen move is drawn from a rules engine's own enumeration of the
-/// position, so it can be applied through <see cref="IChessRulesEngine.TryApplyMove"/> without
-/// further validation; a non-null result never fabricates a move.</description>
+/// <description>
+/// The chosen move is drawn from a rules engine's own enumeration of the position, so it can be
+/// applied through <see cref="IChessRulesEngine.TryApplyMove"/> without further validation; a
+/// non-null result never fabricates a move — a test can round-trip every returned move through
+/// <see cref="IChessRulesEngine.TryApplyMove"/> and assert it is accepted.
+/// </description>
 /// </item>
 /// </list>
 /// </remarks>

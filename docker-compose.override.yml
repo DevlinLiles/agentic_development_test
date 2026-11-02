@@ -1,17 +1,10 @@
-# TEMPORARY local-verification override.
-# Adds a `tests` service (profile "verify") that compiles both test projects — and runs the
-# container-free Domain unit-test suite — under the .NET 10 SDK via docker/tests.Dockerfile,
-# because the local SDK is 8.x and cannot restore the EF Core 10 packages. It is excluded
-# from plain `docker compose up` by the profile, so normal API/client/SQL workflows are
-# unaffected. Verify with:
-#   docker compose build --no-cache tests
-# Safe to delete once a local .NET 10 SDK is available.
-services:
-  tests:
-    profiles:
-      - verify
-    build:
-      context: .
-      dockerfile: docker/tests.Dockerfile
-      target: unittests
-    container_name: chessmvp-tests
+# Intentionally empty.
+#
+# The `tests` service (profile "verify", build via docker/tests.Dockerfile) now lives
+# directly in docker-compose.yml instead of this override file, so it is reachable by
+# service name regardless of how compose is invoked. An explicit
+# `docker compose -f docker-compose.yml ...` does not auto-merge this override, which
+# would silently drop any service defined only here.
+#
+# Nothing is defined in this file. Verify the tests service with:
+#   docker compose build tests

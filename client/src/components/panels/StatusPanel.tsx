@@ -1,7 +1,7 @@
 // Renders purely from a GameStateResponse. No client-side rules evaluation
 // happens here — every displayed fact comes straight from the response
 // fields (status, turn, yourColor, isCheck, result, resultReason,
-// opponentType).
+// opponentType, moveCount).
 //
 // Accessibility notes:
 // - The panel itself is a `role="status"` region, so every message it renders
@@ -12,9 +12,10 @@
 //   that it's their move again. It only renders when the last move on the
 //   board was the computer's — in a computer game that is exactly when it's
 //   the human's turn.
-// - When the computer's reply ends the game, that reply is still announced
-//   (above the terminal banner) rather than being swallowed by it — see
-//   `computerDeliveredLastMove` below (UX verification finding A-2).
+// - When the computer's reply ends the game — by checkmate OR by a draw —
+//   that reply is still announced (above the terminal banner) rather than
+//   being swallowed by it. See `computerDeliveredLastMove` below (UX
+//   verification finding V-1).
 // - The opponent is always named in text (never icon/color alone).
 
 import type { GameStateResponse } from "../../types/gameTypes";
@@ -51,18 +52,21 @@ function terminalMessage(gameState: GameStateResponse): string | null {
  * announced before the terminal banner.
  *
  * The wire's `lastMove` carries no color, so this is inferred from the
- * outcome instead: the human always plays White in a computer game, so a
- * Black win can only have been delivered by the computer's final move. Draws
- * are deliberately not announced — the last mover there is genuinely
- * ambiguous from the response alone, and guessing would sometimes attribute
- * the human's move to the computer.
+ * outcome plus move parity:
+ * - A Black win can only have been delivered by the computer's final move —
+ *   the human always plays White in a computer game.
+ * - A draw can be delivered by either side, but in a computer game the human
+ *   is always White and plies alternate starting with White, so an even
+ *   `moveCount` means the last ply was Black's — i.e. the computer's. An odd
+ *   count means the human's own move drew the game and there was no reply,
+ *   so nothing is announced (UX verification finding V-1).
  */
 function computerDeliveredLastMove(gameState: GameStateResponse): boolean {
-  return (
-    gameState.opponentType === "Computer" &&
-    gameState.result === "BlackWins" &&
-    gameState.lastMove !== null
-  );
+  if (gameState.opponentType !== "Computer" || gameState.lastMove === null) {
+    return false;
+  }
+  if (gameState.result === "BlackWins") return true;
+  return gameState.result === "Draw" && gameState.moveCount % 2 === 0;
 }
 
 export function StatusPanel({ gameState }: StatusPanelProps) {

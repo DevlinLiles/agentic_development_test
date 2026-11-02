@@ -20,3 +20,16 @@
   text-align: center;
   padding: 1rem;
 }
+
+/* Hub connection status (UX finding V-7): rendered as a polite live region
+   by the screen, styled as a subdued one-liner so it informs without
+   alarming. Colors come from the app's custom properties for both schemes. */
+.game-screen__connection {
+  margin: 0;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background-color: var(--code-bg, var(--bg));
+  font-size: 0.9rem;
+  color: var(--text);
+}

@@ -38,7 +38,9 @@ export function CreateGameScreen() {
     } catch (err) {
       // The chosen opponent mode is deliberately kept in state so a retry
       // uses the same mode the user selected.
-      setError(describeApiError(err));
+      // Create-context copy (UX finding V-3): this screen has not submitted
+      // any move, so the message must not talk about one.
+      setError(describeApiError(err, "create"));
       setIsCreating(false);
     }
   };

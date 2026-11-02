@@ -11,6 +11,14 @@ import { describeApiError } from "../utils/describeApiError";
 import type { GameStateResponse } from "../types/gameTypes";
 import "./gameScreen.css";
 
+/** Live-region copy for the hub connection status (UX finding V-7). */
+const CONNECTION_MESSAGES = {
+  Connecting: "Connecting…",
+  Connected: null,
+  Reconnecting: "Connection lost — reconnecting…",
+  Disconnected: "Disconnected — moves may not be up to date. Refresh to catch up.",
+} as const;
+
 export function GameScreen() {
   const { gameId } = useParams<{ gameId: string }>();
   const { getSession, saveSession } = useGameSession();
@@ -74,7 +82,9 @@ export function GameScreen() {
         setSession(newSession);
         setGameState(joinResult.gameState);
       } catch (err) {
-        if (!cancelled) setLoadError(describeApiError(err));
+        // Load-context copy (V-3): a failed fetch must not tell the user
+        // that a "move" failed — this screen has not submitted anything yet.
+        if (!cancelled) setLoadError(describeApiError(err, "load"));
       } finally {
         if (!cancelled) setIsInitializing(false);
       }
@@ -108,12 +118,18 @@ export function GameScreen() {
     setGameState(state);
   }, []);
 
+  // Connection status is surfaced in a polite live region (V-7): without it
+  // a dropped hub connection is invisible and a user could stare at a stale
+  // board believing the computer is still thinking. "Connected" renders
+  // nothing — a healthy connection needs no announcement.
+  const connectionMessage = CONNECTION_MESSAGES[hub.connectionStatus];
+
   if (!gameId) {
     return <p role="alert">Missing game id.</p>;
   }
 
   if (isInitializing) {
-    return <p>Loading game…</p>;
+    return <p role="status">Loading game…</p>;
   }
 
   if (loadError) {
@@ -137,6 +153,11 @@ export function GameScreen() {
 
   return (
     <div className="game-screen">
+      {connectionMessage && (
+        <p className="game-screen__connection" role="status">
+          {connectionMessage}
+        </p>
+      )}
       <StatusPanel gameState={gameState} />
       {!isComputerGame && <JoinLinkPanel gameState={gameState} />}
       <div className="game-screen__layout">

@@ -14,11 +14,9 @@
 //   flight (UX verification finding A-6): a disabled fieldset silently drops
 //   focus to <body> if focus is inside it. Interaction is guarded in
 //   onChange instead, so the radios keep their tab stops and focus stays
-//   put.
-// - The selected option's state is also exposed programmatically via
-//   aria-checked semantics (native radios do this), plus a visually-hidden
-//   selected flag in the option's hint for screen-reader parity with the
-//   visual highlight.
+//   put. The locked state is conveyed with `aria-disabled` plus a CSS class
+//   (see opponentChooser.css, finding V-2), so it is visible to sighted
+//   users as well as to assistive tech.
 
 import type { OpponentKind } from "../../types/gameTypes";
 import "./opponentChooser.css";

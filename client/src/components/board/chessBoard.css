@@ -18,6 +18,17 @@
   pointer-events: none;
 }
 
+/*
+ * Finished game (UX verification finding V-8): the board stays visible for
+ * review, but it must stop looking operable once the result banner is up.
+ * Squares stop announcing a pointer affordance. Nothing is conveyed by
+ * color alone — the status panel's terminal banner carries the "game over"
+ * message in text.
+ */
+.chess-board--ended .chess-square {
+  cursor: default;
+}
+
 .chess-square {
   display: flex;
   align-items: center;
